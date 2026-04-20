@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Program Files/**)",
+      "Read(//c/Users/HebertRicardo/AppData/Roaming/**)",
+      "Read(//c/Users/HebertRicardo/**)",
+      "Bash(powershell.exe -Command \"Get-Command node, npm, bun -ErrorAction SilentlyContinue | Select-Object Name, Source\")",
+      "Bash(powershell.exe -Command \"node --version; npm --version\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem 'C:\\\\Program Files\\\\nodejs' -ErrorAction SilentlyContinue; Get-ChildItem 'C:\\\\Users\\\\HebertRicardo\\\\.bun' -ErrorAction SilentlyContinue; Get-ChildItem 'C:\\\\Users\\\\HebertRicardo\\\\AppData\\\\Local\\\\nvs' -ErrorAction SilentlyContinue; Get-ChildItem 'C:\\\\Users\\\\HebertRicardo\\\\AppData\\\\Roaming\\\\nvm' -ErrorAction SilentlyContinue\")",
+      "Bash(xargs grep *)"
+    ]
+  }
+}
