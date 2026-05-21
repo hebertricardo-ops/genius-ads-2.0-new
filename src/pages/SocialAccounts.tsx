@@ -50,20 +50,40 @@ const SocialAccounts = () => {
     };
   }, []);
 
-  // Sync automático ao retornar da URL ?connected=true
+  // Sync automático ao retornar da URL ?connected=true — com retry
   useEffect(() => {
-    if (searchParams.get("connected") === "true") {
-      setSyncing(true);
-      syncStatus()
-        .then(() => {
+    if (searchParams.get("connected") !== "true") return;
+
+    setSyncing(true);
+
+    const attemptSync = async (retriesLeft: number): Promise<void> => {
+      try {
+        const result = await syncStatus();
+
+        // Upload-Post ainda não processou a conexão — tentar novamente
+        if (result?.sync_warning && retriesLeft > 0) {
+          await new Promise((r) => setTimeout(r, 3000));
+          return attemptSync(retriesLeft - 1);
+        }
+
+        if (result?.sync_warning) {
+          toast({
+            title: "Conexão realizada",
+            description: "O status pode levar alguns segundos para atualizar. Clique em 'Verificar conexão' se necessário.",
+          });
+        } else {
           toast({ title: "Redes sociais conectadas com sucesso! 🎉" });
-          navigate("/social-accounts", { replace: true });
-        })
-        .catch((err: any) => {
-          toast({ title: "Erro ao sincronizar", description: err.message, variant: "destructive" });
-        })
-        .finally(() => setSyncing(false));
-    }
+        }
+        navigate("/social-accounts", { replace: true });
+      } catch (err: any) {
+        toast({ title: "Erro ao sincronizar", description: err.message, variant: "destructive" });
+      } finally {
+        setSyncing(false);
+      }
+    };
+
+    // Aguardar 2s antes da primeira tentativa — dá tempo ao Upload-Post processar
+    setTimeout(() => attemptSync(3), 2000);
   }, []);
 
   // ── Verificar conexão (botão) ──────────────────────────────────────────────

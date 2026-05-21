@@ -125,7 +125,7 @@ export const useSocialPublish = () => {
     }
   };
 
-  const syncStatus = async (): Promise<{ is_connected: boolean; connected_platforms: string[] }> => {
+  const syncStatus = async (): Promise<{ is_connected: boolean; connected_platforms: string[]; sync_warning?: boolean; profile_deleted?: boolean }> => {
     const { data, error } = await supabase.functions.invoke("social-sync-status", {
       body: { brand_id: selectedBrand?.id },
     });
