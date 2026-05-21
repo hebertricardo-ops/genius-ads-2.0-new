@@ -1,32 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { sanitizeFileName } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import Stepper from "@/components/Stepper";
 import ImageUpload from "@/components/ImageUpload";
 import CreditsBadge from "@/components/CreditsBadge";
-import { ArrowLeft, ArrowRight, Sparkles, Zap, Check, Eye, Palette } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles, Zap, Building2, Images, X, Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useCredits } from "@/hooks/useCredits";
+import { useBrandContext } from "@/contexts/BrandContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
 import GenerationProgress from "@/components/GenerationProgress";
 
-const STEPS = ["Imagens", "Produto", "Persuasão", "CTA"];
+const STEPS = ["Produto", "Persuasão", "CTA", "Criar"];
 
-interface VisualOption {
-  option_label: string;
+interface VisualConcept {
   visual_description: string;
   element_distribution: string;
   composition: string;
   visual_hierarchy: string;
   layout_style: string;
   cta_highlight: string;
+  thematic_elements: string;
 }
 
 interface CopyAngle {
@@ -35,12 +44,32 @@ interface CopyAngle {
   subheadline?: string;
   body: string;
   cta: string;
-  visual_options: VisualOption[];
+  visual_concept: VisualConcept | null;
 }
+
+const BRAND_VISUAL_STYLE_MAP: Record<string, string> = {
+  "Moderno Tecnológico": "tech",
+  "Moderno Profissional": "corporate",
+  "Clean Minimalista": "clean",
+  "Premium Luxuoso": "premium",
+  "Vibrante Chamativo": "vibrant",
+  "Claro Light Minimalista": "light",
+  "Tecnológico Futurista": "tech",
+  "Infantil Lúdico": "playful",
+  "Romântico Minimalista": "clean",
+  "Maternidade Premium": "premium",
+  "Divertido Artístico": "vibrant",
+};
 
 const CreateCreative = () => {
   const [step, setStep] = useState(0);
   const [images, setImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [editingImageIdx, setEditingImageIdx] = useState<number | null>(null);
+  const [dialogImage, setDialogImage] = useState<File[]>([]);
+  const [dialogInstruction, setDialogInstruction] = useState("");
+  const [includeLogo, setIncludeLogo] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [productName, setProductName] = useState("");
   const [promise, setPromise] = useState("");
@@ -52,25 +81,98 @@ const CreateCreative = () => {
   const [generatedAngles, setGeneratedAngles] = useState<CopyAngle[] | null>(null);
   const [adCaptions, setAdCaptions] = useState<{ caption: string }[]>([]);
   const [selectedAngle, setSelectedAngle] = useState<number | null>(null);
-  const [selectedVisual, setSelectedVisual] = useState<number | null>(null);
-  const [expandedAngle, setExpandedAngle] = useState<number | null>(null);
   const [format, setFormat] = useState("1:1");
+  const [imageModel, setImageModel] = useState("gpt-image-2");
+  const [imageInstructions, setImageInstructions] = useState<string[]>([]);
   const [creativeStyle, setCreativeStyle] = useState("");
   const [additionalInstructions, setAdditionalInstructions] = useState("");
   const [generatingCreative, setGeneratingCreative] = useState(false);
+  const [generatingPromise, setGeneratingPromise] = useState(false);
   const [isCreditsDialogOpen, setIsCreditsDialogOpen] = useState(false);
+  const [brandFilledFields, setBrandFilledFields] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const { data: credits } = useCredits();
+  const { selectedBrand } = useBrandContext();
   const queryClient = useQueryClient();
+
+  // Pre-fill from selected brand
+  useEffect(() => {
+    if (!selectedBrand) return;
+    const filled = new Set<string>();
+
+    setProductName(selectedBrand.name);
+    filled.add("productName");
+
+    if (selectedBrand.visual_style) {
+      const slug = BRAND_VISUAL_STYLE_MAP[selectedBrand.visual_style] ?? "";
+      if (slug) { setCreativeStyle(slug); filled.add("creativeStyle"); }
+    }
+
+    if (selectedBrand.audience_pains?.length) {
+      setPains(selectedBrand.audience_pains.join("\n"));
+      filled.add("pains");
+    }
+
+    if (selectedBrand.benefits?.length) {
+      setBenefits(selectedBrand.benefits.join("\n"));
+      filled.add("benefits");
+    }
+
+    if (selectedBrand.generated_promise) {
+      setPromise(selectedBrand.generated_promise);
+      filled.add("promise");
+    }
+
+    setBrandFilledFields(filled);
+  }, [selectedBrand?.id]);
+
+  // Generate promise via AI if brand doesn't have one yet
+  useEffect(() => {
+    if (!selectedBrand || selectedBrand.generated_promise) return;
+    if (!selectedBrand.description && !selectedBrand.benefits?.length) return;
+
+    const generate = async () => {
+      setGeneratingPromise(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("generate-brand-promise", {
+          body: {
+            name: selectedBrand.name,
+            description: selectedBrand.description,
+            benefits: selectedBrand.benefits,
+          },
+        });
+        if (error || !data?.promise) return;
+
+        setPromise(data.promise);
+        setBrandFilledFields((prev) => new Set([...prev, "promise"]));
+
+        // Persist so future sessions reuse this text
+        await (supabase as any).from("brands").update({ generated_promise: data.promise }).eq("id", selectedBrand.id);
+        queryClient.invalidateQueries({ queryKey: ["brands", user?.id] });
+      } catch {
+        // Silently fail — user can fill the field manually
+      } finally {
+        setGeneratingPromise(false);
+      }
+    };
+
+    generate();
+  }, [selectedBrand?.id]);
+
+  // Thumbnail preview URLs — revoke previous on change
+  useEffect(() => {
+    const urls = images.map(f => URL.createObjectURL(f));
+    setImagePreviews(urls);
+    return () => urls.forEach(u => URL.revokeObjectURL(u));
+  }, [images]);
 
   const canProceed = () => {
     switch (step) {
-      case 0: return images.length > 0;
-      case 1: return productName.trim() && promise.trim();
-      case 2: return pains.trim() && benefits.trim();
-      case 3: return true;
+      case 0: return productName.trim().length > 0 && promise.trim().length > 0;
+      case 1: return pains.trim().length > 0 && benefits.trim().length > 0;
+      case 2: return true;
       default: return false;
     }
   };
@@ -84,16 +186,6 @@ const CreateCreative = () => {
 
     setLoading(true);
     try {
-      // 1. Upload images
-      const imageUrls: string[] = [];
-      for (const file of images) {
-        const path = `${user.id}/${Date.now()}-${sanitizeFileName(file.name)}`;
-        const { error } = await supabase.storage.from("creative-uploads").upload(path, file);
-        if (error) throw error;
-        imageUrls.push(path);
-      }
-
-      // 2. Create request record
       const { data: request, error: reqError } = await supabase
         .from("creative_requests")
         .insert({
@@ -111,18 +203,28 @@ const CreateCreative = () => {
         .single();
       if (reqError) throw reqError;
 
-      // 3. Generate copy via edge function
       const { data: copyData, error: copyError } = await supabase.functions.invoke("generate-copy", {
-        body: { product_name: productName, promise, pains, benefits, objections, cta, creative_style: creativeStyle || undefined },
+        body: {
+          product_name: productName,
+          promise,
+          pains,
+          benefits,
+          objections,
+          cta,
+          creative_style: creativeStyle || undefined,
+          additional_instructions: additionalInstructions.trim() || undefined,
+        },
       });
       if (copyError) throw copyError;
 
-      setGeneratedAngles(copyData.angles);
+      if (!copyData?.angles?.length) throw new Error("Resposta da IA inválida — tente novamente.");
+      setGeneratedAngles(copyData.angles.map((a: CopyAngle) => ({
+        ...a,
+        visual_concept: a.visual_concept ?? null,
+      })));
       setAdCaptions(copyData.ad_captions || []);
       setSelectedAngle(null);
-      setSelectedVisual(null);
 
-      // Update request status (copy generated, no credits debited yet - credits only on image generation)
       await supabase
         .from("creative_requests")
         .update({ status: "completed" })
@@ -130,10 +232,9 @@ const CreateCreative = () => {
 
       queryClient.invalidateQueries({ queryKey: ["creative-requests"] });
 
-      toast({ title: "Copies geradas!", description: "Escolha seu ângulo e opção visual." });
+      toast({ title: "Copies geradas!", description: "Escolha seu ângulo e gere o criativo." });
     } catch (err: any) {
       console.error(err);
-      // Update request status to error if we have a request
       try {
         const { data: lastReq } = await supabase
           .from("creative_requests")
@@ -154,9 +255,9 @@ const CreateCreative = () => {
   };
 
   const handleGenerateCreative = async () => {
-    if (selectedAngle === null || selectedVisual === null || !generatedAngles || !user) return;
+    if (selectedAngle === null || !generatedAngles || !user) return;
     const angle = generatedAngles[selectedAngle];
-    const visual = angle.visual_options[selectedVisual];
+    const visual = angle.visual_concept;
 
     if ((credits?.credits_balance ?? 0) < quantity) {
       toast({ title: "Créditos insuficientes", description: "Você não tem créditos suficientes para gerar.", variant: "destructive" });
@@ -165,7 +266,7 @@ const CreateCreative = () => {
 
     setGeneratingCreative(true);
     try {
-      // 1. Get public URLs for uploaded images
+      // Upload product images
       const imageUrls: string[] = [];
       for (const file of images) {
         const path = `${user.id}/${Date.now()}-${sanitizeFileName(file.name)}`;
@@ -173,15 +274,38 @@ const CreateCreative = () => {
         if (upErr) throw upErr;
         const { data: signedUrlData, error: signedUrlErr } = await supabase.storage
           .from("creative-uploads")
-          .createSignedUrl(path, 600); // 10 min expiry
+          .createSignedUrl(path, 600);
         if (signedUrlErr || !signedUrlData?.signedUrl) throw new Error("Failed to create signed URL");
         imageUrls.push(signedUrlData.signedUrl);
       }
 
-      // 2. Call generate-creative edge function
+      // Get accessible logo URL only if toggle is on
+      let logoUrl: string | undefined;
+      if (includeLogo && selectedBrand?.logo_url) {
+        const supabaseMatch = selectedBrand.logo_url.match(
+          /\/storage\/v1\/object\/(?:public|sign)\/creative-uploads\/(.+?)(?:\?|$)/
+        );
+        if (supabaseMatch) {
+          const { data: signed } = await supabase.storage
+            .from("creative-uploads")
+            .createSignedUrl(supabaseMatch[1], 600);
+          logoUrl = signed?.signedUrl;
+        } else {
+          logoUrl = selectedBrand.logo_url;
+        }
+      }
+
+      // Brand color palette
+      const brandColors = [
+        selectedBrand?.color_primary,
+        selectedBrand?.color_secondary,
+        selectedBrand?.color_accent,
+      ].filter(Boolean) as string[];
+
       const { data: creativeData, error: creativeError } = await supabase.functions.invoke("generate-creative", {
         body: {
           image_urls: imageUrls,
+          logo_url: logoUrl,
           product_name: productName,
           promise,
           pains,
@@ -190,25 +314,36 @@ const CreateCreative = () => {
           headline: angle.headline,
           body: angle.body,
           cta: angle.cta,
-          visual_option: {
+          visual_option: visual ? {
             visual_description: visual.visual_description,
             element_distribution: visual.element_distribution,
             composition: visual.composition,
             visual_hierarchy: visual.visual_hierarchy,
             layout_style: visual.layout_style,
             cta_highlight: visual.cta_highlight,
-          },
+            thematic_elements: visual.thematic_elements,
+          } : undefined,
           format,
           quantity,
           creative_style: creativeStyle || undefined,
+          color_palette: brandColors.length > 0 ? brandColors : undefined,
           additional_instructions: additionalInstructions.trim() || undefined,
+          image_instructions: imageInstructions.length > 0 ? imageInstructions : undefined,
+          model: imageModel,
         },
       });
-      if (creativeError) throw creativeError;
+      if (creativeError) {
+        let errorMsg = creativeError.message;
+        try {
+          const body = await (creativeError as any).context?.json?.();
+          if (body?.error) errorMsg = body.error;
+        } catch {}
+        throw new Error(errorMsg);
+      }
 
       const generatedImages = creativeData?.images || [];
+      const caption: string = creativeData?.caption || "";
 
-      // 2b. Get or create a request_id for linking results
       const { data: reqData } = await supabase
         .from("creative_requests")
         .select("id")
@@ -219,28 +354,27 @@ const CreateCreative = () => {
         .single();
       const requestId = reqData?.id;
 
-      // 3. Save each generated image
       for (const img of generatedImages) {
         const imgUrl = img.url || img;
-        await supabase.from("generated_creatives").insert({
+        await (supabase as any).from("generated_creatives").insert({
           user_id: user.id,
           image_url: imgUrl,
           request_id: requestId || null,
+          brand_id: selectedBrand?.id ?? null,
           copy_data: {
             angle_name: angle.angle_name,
             headline: angle.headline,
             subheadline: angle.subheadline,
             body: angle.body,
             cta: angle.cta,
-            visual_option: visual.option_label,
+            visual_option: visual ?? null,
             format,
-            ad_captions: adCaptions,
+            caption,
           },
           credits_used: 1,
         });
       }
 
-      // 4. Deduct credits (fetch fresh balance to avoid stale state)
       const usedCredits = generatedImages.length || quantity;
       const { data: freshCredits } = await supabase
         .from("user_credits")
@@ -284,352 +418,487 @@ const CreateCreative = () => {
     }
   };
 
+  const openAddDialog = () => {
+    setEditingImageIdx(null);
+    setDialogImage([]);
+    setDialogInstruction("");
+    setImageDialogOpen(true);
+  };
+
+  const openEditDialog = (idx: number) => {
+    setEditingImageIdx(idx);
+    setDialogImage([images[idx]]);
+    setDialogInstruction(imageInstructions[idx] ?? "");
+    setImageDialogOpen(true);
+  };
+
+  const handleDialogConfirm = () => {
+    if (dialogImage.length === 0) return;
+    if (editingImageIdx !== null) {
+      const newImages = [...images];
+      newImages[editingImageIdx] = dialogImage[0];
+      setImages(newImages);
+      const newInstructions = [...imageInstructions];
+      newInstructions[editingImageIdx] = dialogInstruction;
+      setImageInstructions(newInstructions);
+    } else {
+      setImages(prev => [...prev, dialogImage[0]]);
+      setImageInstructions(prev => [...prev, dialogInstruction]);
+    }
+    setImageDialogOpen(false);
+  };
+
+  const removeImage = (idx: number) => {
+    setImages(prev => prev.filter((_, i) => i !== idx));
+    setImageInstructions(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const resetWizard = () => {
+    setGeneratedAngles(null);
+    setStep(0);
+    setImages([]);
+    setImageInstructions([]);
+    setSelectedAngle(null);
+    setImageDialogOpen(false);
+  };
+
+  const BrandBadge = ({ field }: { field: string }) =>
+    brandFilledFields.has(field) ? (
+      <span className="inline-flex items-center gap-1 text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-primary/10 text-primary ml-1">
+        <Sparkles className="w-2.5 h-2.5" /> da marca
+      </span>
+    ) : null;
+
   const angleLabels = ["🔴 Dor Principal", "🟢 Transformação", "🟡 Quebra de Objeção"];
+
+  if (!selectedBrand) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+          <Building2 className="w-7 h-7 text-primary" />
+        </div>
+        <h2 className="text-2xl font-display text-foreground mb-2">Selecione uma marca</h2>
+        <p className="text-muted-foreground mb-6 max-w-sm">
+          Para criar um criativo, selecione ou cadastre uma marca no menu lateral.
+        </p>
+        <Button variant="hero" onClick={() => navigate("/brands/new")}>
+          <Building2 className="w-4 h-4" />
+          Cadastrar Marca
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {generatedAngles ? (
-          <div className="space-y-8 animate-fade-in">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-display text-foreground mb-2">Escolha seu Ângulo e Conceito Visual</h2>
-              <p className="text-muted-foreground">3 ângulos × 2 opções visuais = 6 conceitos para "{productName}"</p>
-            </div>
+        <div className="mb-10">
+          <Stepper steps={STEPS} currentStep={step} />
+        </div>
 
-            {/* Angle selection */}
-            <div className="space-y-6">
-              {generatedAngles.map((angle, angleIdx) => (
-                <div key={angleIdx} className="space-y-4">
-                  {/* Angle header card */}
-                  <div
-                    className={`gradient-card rounded-2xl p-6 border-2 shadow-card cursor-pointer transition-all duration-200 ${
-                      selectedAngle === angleIdx
-                        ? "border-primary ring-2 ring-primary/20"
-                        : "border-border hover:border-primary/40"
-                    }`}
-                    onClick={() => {
-                      setSelectedAngle(angleIdx);
-                      setSelectedVisual(null);
-                      setExpandedAngle(expandedAngle === angleIdx ? null : angleIdx);
-                    }}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-primary uppercase tracking-wider">
-                            {angleLabels[angleIdx] || angle.angle_name}
-                          </span>
-                          {selectedAngle === angleIdx && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                              <Check className="w-3 h-3" /> Selecionado
-                            </span>
-                          )}
-                        </div>
-                        <h3 className="text-xl font-display text-foreground">{angle.headline}</h3>
-                        {angle.subheadline && (
-                          <p className="text-sm text-muted-foreground font-medium">{angle.subheadline}</p>
-                        )}
-                        <p className="text-sm text-foreground/80">{angle.body}</p>
-                        <div className="pt-2">
-                          <span className="inline-block px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold">
-                            {angle.cta}
-                          </span>
-                        </div>
-                      </div>
-                      <Eye className="w-5 h-5 text-muted-foreground mt-1 shrink-0 ml-4" />
-                    </div>
-                  </div>
-
-                  {/* Visual options - show when angle is expanded */}
-                  {(expandedAngle === angleIdx || selectedAngle === angleIdx) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 animate-fade-in">
-                      {angle.visual_options.map((visual, visIdx) => (
-                        <div
-                          key={visIdx}
-                          className={`rounded-xl p-5 border-2 cursor-pointer transition-all duration-200 ${
-                            selectedAngle === angleIdx && selectedVisual === visIdx
-                              ? "bg-primary/5 border-primary ring-2 ring-primary/20"
-                              : "bg-background/50 border-border hover:border-primary/40"
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedAngle(angleIdx);
-                            setSelectedVisual(visIdx);
-                          }}
-                        >
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="font-display text-sm text-foreground">
-                                {visual.option_label}
-                              </span>
-                              {selectedAngle === angleIdx && selectedVisual === visIdx && (
-                                <Check className="w-4 h-4 text-primary" />
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground">{visual.visual_description}</p>
-                            <div className="space-y-2 text-xs">
-                              <div>
-                                <span className="font-semibold text-foreground/70">Elementos:</span>{" "}
-                                <span className="text-muted-foreground">{visual.element_distribution}</span>
-                              </div>
-                              <div>
-                                <span className="font-semibold text-foreground/70">Composição:</span>{" "}
-                                <span className="text-muted-foreground">{visual.composition}</span>
-                              </div>
-                              <div>
-                                <span className="font-semibold text-foreground/70">Hierarquia:</span>{" "}
-                                <span className="text-muted-foreground">{visual.visual_hierarchy}</span>
-                              </div>
-                              <div>
-                                <span className="font-semibold text-foreground/70">Layout:</span>{" "}
-                                <span className="text-muted-foreground">{visual.layout_style}</span>
-                              </div>
-                              <div>
-                                <span className="font-semibold text-foreground/70">CTA:</span>{" "}
-                                <span className="text-muted-foreground">{visual.cta_highlight}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+        {/* Steps 0–2: wizard */}
+        {step < 3 && (
+          <div className="gradient-card rounded-2xl p-8 shadow-card border border-border animate-fade-in">
+            {/* Step 0 — Produto */}
+            {step === 0 && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-display text-foreground mb-2">Sobre o produto</h2>
+                  <p className="text-muted-foreground text-sm">Informações básicas para gerar a copy do anúncio</p>
                 </div>
-              ))}
-            </div>
-
-            {/* Format selector */}
-            {selectedAngle !== null && selectedVisual !== null && (
-              <div className="space-y-4 animate-fade-in">
-                <h3 className="text-lg font-display text-foreground text-center">Formato do Criativo</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-lg mx-auto">
-                  {[
-                    { value: "1:1", label: "1:1", desc: "Feed" },
-                    { value: "4:5", label: "4:5", desc: "Feed vertical" },
-                    { value: "9:16", label: "9:16", desc: "Stories/Reels" },
-                    { value: "16:9", label: "16:9", desc: "Landscape" },
-                  ].map((f) => (
-                    <div
-                      key={f.value}
-                      className={`rounded-xl p-4 border-2 cursor-pointer transition-all text-center ${
-                        format === f.value
-                          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                          : "border-border hover:border-primary/40 bg-background/50"
-                      }`}
-                      onClick={() => setFormat(f.value)}
-                    >
-                      <span className="font-display text-foreground">{f.label}</span>
-                      <p className="text-xs text-muted-foreground mt-1">{f.desc}</p>
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">
+                      Nome do produto *<BrandBadge field="productName" />
+                    </Label>
+                    <Input value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="Ex: Sérum Vitamina C Premium" className="bg-background/50 border-border" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                      Promessa principal *
+                      {generatingPromise && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                          <Sparkles className="w-2.5 h-2.5 animate-pulse" /> gerando...
+                        </span>
+                      )}
+                    </Label>
+                    <Textarea value={promise} onChange={(e) => setPromise(e.target.value)} placeholder="Ex: Pele mais jovem e radiante em 30 dias" className="bg-background/50 border-border resize-none" rows={3} disabled={generatingPromise} />
+                  </div>
+                </div>
+                <div className="space-y-3 pt-2 border-t border-border">
+                  <h2 className="text-xl font-display text-foreground pt-2">Quantidade de criativos</h2>
+                  <div className="flex gap-3">
+                    {[1, 2, 3, 4].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setQuantity(num)}
+                        className={`flex items-center justify-center w-14 h-14 rounded-xl border-2 text-lg font-bold transition-all duration-200 ${
+                          quantity === num
+                            ? "border-primary bg-primary/10 text-primary shadow-md scale-105"
+                            : "border-border bg-background/50 text-muted-foreground hover:border-primary/50 hover:bg-primary/5"
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Cada criativo consome 1 crédito</p>
+                </div>
+                <div className="space-y-3 pt-2 border-t border-border">
+                  <h2 className="text-xl font-display text-foreground pt-2">
+                    Estilo do Criativo<BrandBadge field="creativeStyle" />
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: "dark", label: "Dark / Escuro" },
+                      { value: "light", label: "Claro / Light" },
+                      { value: "clean", label: "Clean / Minimalista" },
+                      { value: "premium", label: "Premium / Luxuoso" },
+                      { value: "playful", label: "Infantil / Lúdico" },
+                      { value: "tech", label: "Tecnológico / Futurista" },
+                      { value: "vibrant", label: "Vibrante / Chamativo" },
+                      { value: "corporate", label: "Corporativo / Profissional" },
+                    ].map((style) => (
+                      <button
+                        key={style.value}
+                        type="button"
+                        onClick={() => setCreativeStyle(creativeStyle === style.value ? "" : style.value)}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all duration-200 ${
+                          creativeStyle === style.value
+                            ? "border-primary bg-primary/10 text-primary shadow-md scale-105"
+                            : "border-border bg-background/50 text-muted-foreground hover:border-primary/50 hover:bg-primary/5"
+                        }`}
+                      >
+                        {style.label}
+                      </button>
+                    ))}
+                  </div>
+                  {!creativeStyle && (
+                    <p className="text-xs text-muted-foreground">Nenhum estilo selecionado — a IA escolherá automaticamente.</p>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Generation progress overlay */}
-            <GenerationProgress
-              isActive={generatingCreative}
-              type="creative"
-              onTimeout={() => {
-                toast({ title: "Geração demorada", description: "O processo está demorando mais que o esperado. Se persistir, tente novamente.", variant: "destructive" });
-              }}
-            />
-
-            {/* Actions */}
-            <div className="flex gap-4 justify-center pt-4">
-              <Button variant="outline" onClick={() => { setGeneratedAngles(null); setStep(0); setImages([]); }}>
-                Novo Criativo
-              </Button>
-              <Button
-                variant="hero"
-                onClick={handleGenerateCreative}
-                disabled={selectedAngle === null || selectedVisual === null || generatingCreative}
-              >
-                {generatingCreative ? "Gerando criativo..." : <><Sparkles className="w-4 h-4" /> Gerar Criativo</>}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="mb-10"><Stepper steps={STEPS} currentStep={step} /></div>
-            <div className="gradient-card rounded-2xl p-8 shadow-card border border-border animate-fade-in">
-              {step === 0 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-display text-foreground mb-2">Envie suas imagens</h2>
-                    <p className="text-muted-foreground text-sm">Faça upload das imagens do produto (máx. 4)</p>
-                  </div>
-                  <ImageUpload images={images} onImagesChange={setImages} />
-                  <div className="space-y-3">
-                    <h2 className="text-xl font-display text-foreground">Quantidade de criativos</h2>
-                    <div className="flex gap-3">
-                      {[1, 2, 3, 4].map((num) => (
-                        <button
-                          key={num}
-                          type="button"
-                          onClick={() => setQuantity(num)}
-                          className={`flex items-center justify-center w-14 h-14 rounded-xl border-2 text-lg font-bold transition-all duration-200 ${
-                            quantity === num
-                              ? "border-primary bg-primary/10 text-primary shadow-md scale-105"
-                              : "border-border bg-background/50 text-muted-foreground hover:border-primary/50 hover:bg-primary/5"
-                          }`}
-                        >
-                          {num}
-                        </button>
-                      ))}
-                    </div>
-                   <p className="text-xs text-muted-foreground">Cada criativo consome 1 crédito</p>
-                  </div>
-
-                  {/* Estilo Principal do Criativo */}
-                  <div className="space-y-3">
-                    <h2 className="text-xl font-display text-foreground">Estilo do Criativo</h2>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { value: "dark", label: "Dark / Escuro" },
-                        { value: "light", label: "Claro / Light" },
-                        { value: "clean", label: "Clean / Minimalista" },
-                        { value: "premium", label: "Premium / Luxuoso" },
-                        { value: "playful", label: "Infantil / Lúdico" },
-                        { value: "tech", label: "Tecnológico / Futurista" },
-                        { value: "vibrant", label: "Vibrante / Chamativo" },
-                        { value: "corporate", label: "Corporativo / Profissional" },
-                      ].map((style) => (
-                        <button
-                          key={style.value}
-                          type="button"
-                          onClick={() => setCreativeStyle(creativeStyle === style.value ? "" : style.value)}
-                          className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all duration-200 ${
-                            creativeStyle === style.value
-                              ? "border-primary bg-primary/10 text-primary shadow-md scale-105"
-                              : "border-border bg-background/50 text-muted-foreground hover:border-primary/50 hover:bg-primary/5"
-                          }`}
-                        >
-                          {style.label}
-                        </button>
-                      ))}
-                    </div>
-                    {!creativeStyle && (
-                      <p className="text-xs text-muted-foreground">Nenhum estilo selecionado — a IA escolherá automaticamente.</p>
-                    )}
-                  </div>
+            {/* Step 1 — Persuasão */}
+            {step === 1 && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-display text-foreground mb-2">Elementos de persuasão</h2>
+                  <p className="text-muted-foreground text-sm">Dores, benefícios e objeções do público-alvo</p>
                 </div>
-              )}
-              {step === 1 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-display text-foreground mb-2">Sobre o produto</h2>
-                    <p className="text-muted-foreground text-sm">Informações para gerar a copy do anúncio</p>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">Nome do produto *</Label>
-                      <Input value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="Ex: Sérum Vitamina C Premium" className="bg-background/50 border-border" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">Promessa principal *</Label>
-                      <Textarea value={promise} onChange={(e) => setPromise(e.target.value)} placeholder="Ex: Pele mais jovem e radiante em 30 dias" className="bg-background/50 border-border resize-none" rows={3} />
-                    </div>
-                  </div>
-                </div>
-              )}
-              {step === 2 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-display text-foreground mb-2">Elementos de persuasão</h2>
-                    <p className="text-muted-foreground text-sm">Dores, benefícios e objeções do público-alvo</p>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">Dores do público *</Label>
-                      <Textarea value={pains} onChange={(e) => setPains(e.target.value)} placeholder="Ex: Manchas, rugas precoces, pele sem vida" className="bg-background/50 border-border resize-none" rows={3} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">Benefícios *</Label>
-                      <Textarea value={benefits} onChange={(e) => setBenefits(e.target.value)} placeholder="Ex: Reduz manchas, ilumina a pele, antioxidante" className="bg-background/50 border-border resize-none" rows={3} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">Objeções comuns (opcional)</Label>
-                      <Textarea value={objections} onChange={(e) => setObjections(e.target.value)} placeholder='Ex: "É caro", "Será que funciona?"' className="bg-background/50 border-border resize-none" rows={2} />
-                    </div>
-                  </div>
-                </div>
-              )}
-              {step === 3 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-display text-foreground mb-2">Call to Action</h2>
-                    <p className="text-muted-foreground text-sm">Defina o CTA do seu anúncio (opcional)</p>
-                  </div>
-                  <div className="space-y-3">
-                    <Label className="text-sm text-muted-foreground">Sugestões de CTA</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {["Clique em Saiba Mais", "Fale Conosco", "Assistir Mais", "Cadastre-se Agora", "Obter Oferta"].map((suggestion) => (
-                        <button
-                          key={suggestion}
-                          type="button"
-                          onClick={() => setCta(suggestion)}
-                          className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
-                            cta === suggestion
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-background/50 text-muted-foreground border-border hover:border-primary/50"
-                          }`}
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
-                    </div>
-                    <Label className="text-sm text-muted-foreground">CTA personalizado</Label>
-                    <Input value={cta} onChange={(e) => setCta(e.target.value)} placeholder='Ex: "Compre agora com 30% OFF"' className="bg-background/50 border-border" />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">
+                      Dores do público *<BrandBadge field="pains" />
+                    </Label>
+                    <Textarea value={pains} onChange={(e) => setPains(e.target.value)} placeholder="Ex: Manchas, rugas precoces, pele sem vida" className="bg-background/50 border-border resize-none" rows={3} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Orientações adicionais (opcional)</Label>
-                    <Textarea
-                      value={additionalInstructions}
-                      onChange={(e) => setAdditionalInstructions(e.target.value)}
-                      placeholder="Ex: Usar a imagem do produto como elemento central, incluir selo de garantia, adicionar efeito de brilho no fundo..."
-                      className="bg-background/50 border-border resize-none"
-                      rows={3}
-                    />
+                    <Label className="text-sm text-muted-foreground">
+                      Benefícios *<BrandBadge field="benefits" />
+                    </Label>
+                    <Textarea value={benefits} onChange={(e) => setBenefits(e.target.value)} placeholder="Ex: Reduz manchas, ilumina a pele, antioxidante" className="bg-background/50 border-border resize-none" rows={3} />
                   </div>
-                  <div className="bg-background/30 rounded-xl p-5 border border-border space-y-3">
-                    <h3 className="font-display text-sm text-foreground">Resumo</h3>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div><span className="text-muted-foreground">Imagens:</span> <span className="text-foreground">{images.length}</span></div>
-                      <div><span className="text-muted-foreground">Criativos:</span> <span className="text-foreground">{quantity}</span></div>
-                      <div><span className="text-muted-foreground">Produto:</span> <span className="text-foreground">{productName}</span></div>
-                      <div><span className="text-muted-foreground">Créditos:</span> <span className="text-primary font-semibold">{quantity}</span></div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Objeções comuns (opcional)</Label>
+                    <Textarea value={objections} onChange={(e) => setObjections(e.target.value)} placeholder='Ex: "É caro", "Será que funciona?"' className="bg-background/50 border-border resize-none" rows={2} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2 — CTA */}
+            {step === 2 && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-display text-foreground mb-2">Call to Action</h2>
+                  <p className="text-muted-foreground text-sm">Defina o CTA do seu anúncio (opcional)</p>
+                </div>
+                <div className="space-y-3">
+                  <Label className="text-sm text-muted-foreground">Sugestões de CTA</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {["Clique em Saiba Mais", "Fale Conosco", "Assistir Mais", "Cadastre-se Agora", "Obter Oferta"].map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => setCta(suggestion)}
+                        className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
+                          cta === suggestion
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background/50 text-muted-foreground border-border hover:border-primary/50"
+                        }`}
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                  <Label className="text-sm text-muted-foreground">CTA personalizado</Label>
+                  <Input value={cta} onChange={(e) => setCta(e.target.value)} placeholder='Ex: "Compre agora com 30% OFF"' className="bg-background/50 border-border" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Orientações adicionais (opcional)</Label>
+                  <Textarea
+                    value={additionalInstructions}
+                    onChange={(e) => setAdditionalInstructions(e.target.value)}
+                    placeholder="Ex: Incluir selo de garantia, adicionar efeito de brilho no fundo..."
+                    className="bg-background/50 border-border resize-none"
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+              <Button variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
+                <ArrowLeft className="w-4 h-4" /> Voltar
+              </Button>
+              {step < 2 ? (
+                <Button variant="hero" onClick={() => setStep(step + 1)} disabled={!canProceed()}>
+                  Próximo <ArrowRight className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button variant="hero" onClick={() => { setStep(3); handleGenerate(); }} disabled={!canProceed()}>
+                  Próximo <ArrowRight className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Step 3 — Criar */}
+        {step === 3 && (
+          loading ? (
+            <div className="flex flex-col items-center justify-center py-32 space-y-6 animate-fade-in">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+              </div>
+              <div className="text-center space-y-2">
+                <h2 className="text-xl font-display text-foreground">Gerando suas copies...</h2>
+                <p className="text-muted-foreground text-sm">A IA está criando 3 ângulos de copy para "{productName}"</p>
+              </div>
+            </div>
+          ) : generatedAngles ? (
+            <div className="space-y-8 animate-fade-in">
+              <div className="text-center mb-2">
+                <h2 className="text-2xl font-display text-foreground mb-2">Escolha o ângulo da copy</h2>
+                <p className="text-muted-foreground text-sm">Selecione a copy que melhor representa seu anúncio</p>
+              </div>
+
+              {/* Angle cards */}
+              <div className="space-y-4">
+                {generatedAngles
+                  .filter((_, idx) => selectedAngle === null || selectedAngle === idx)
+                  .map((angle, _unused, arr) => {
+                  const angleIdx = generatedAngles.indexOf(angle);
+                  const isSelected = selectedAngle === angleIdx;
+                  return (
+                    <div
+                      key={angleIdx}
+                      className={`gradient-card rounded-2xl p-6 shadow-card transition-all duration-200 ${
+                        isSelected ? "ring-2 ring-primary/30" : "cursor-pointer hover:ring-1 hover:ring-primary/20"
+                      }`}
+                      onClick={() => !isSelected && setSelectedAngle(angleIdx)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                              {angleLabels[angleIdx] || angle.angle_name}
+                            </span>
+                          </div>
+                          <h3 className="text-xl font-display text-foreground">{angle.headline}</h3>
+                          {angle.subheadline && (
+                            <p className="text-sm text-muted-foreground font-medium">{angle.subheadline}</p>
+                          )}
+                          <p className="text-sm text-foreground/80">{angle.body}</p>
+                          <div className="pt-2">
+                            <span className="inline-block px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold">
+                              {angle.cta}
+                            </span>
+                          </div>
+
+                          {/* Image + logo controls inside selected card */}
+                          {isSelected && (
+                            <div
+                              className="pt-3 mt-1 border-t border-border/50 space-y-3 animate-fade-in"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="flex items-center gap-4 flex-wrap">
+                                {images.length < 3 && (
+                                  <button
+                                    type="button"
+                                    onClick={openAddDialog}
+                                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-2.5 py-1.5 rounded-lg border border-border/60 hover:border-primary/40 bg-background/40"
+                                  >
+                                    <Images className="w-3.5 h-3.5" />
+                                    Adicionar Imagem
+                                  </button>
+                                )}
+
+                                {selectedBrand?.logo_url && (
+                                  <div
+                                    className="inline-flex items-center gap-2"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Label htmlFor="logo-toggle" className="text-xs text-muted-foreground cursor-pointer">
+                                      Enviar Logo
+                                    </Label>
+                                    <Switch
+                                      id="logo-toggle"
+                                      checked={includeLogo}
+                                      onCheckedChange={setIncludeLogo}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {isSelected && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedAngle(null);
+                              setImages([]);
+                              setImageInstructions([]);
+                            }}
+                            className="inline-flex items-center gap-1 text-xs text-red-400/80 hover:text-red-500 bg-red-50/60 hover:bg-red-50 dark:bg-red-950/20 dark:hover:bg-red-950/40 px-2.5 py-1.5 rounded-lg transition-colors shrink-0 ml-4 mt-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                            Trocar ângulo
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Image thumbnails */}
+              {selectedAngle !== null && images.length > 0 && (
+                <div className="flex gap-3 flex-wrap animate-fade-in">
+                  {images.map((file, idx) => (
+                    <div key={idx} className="relative group w-20 h-20 shrink-0">
+                      <img
+                        src={imagePreviews[idx]}
+                        alt={file.name}
+                        className="w-full h-full rounded-xl object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 rounded-xl transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditDialog(idx)}
+                          className="p-1 rounded-md bg-white/20 hover:bg-white/30 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-white" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="p-1 rounded-md bg-white/20 hover:bg-white/30 transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5 text-white" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Format selector */}
+              {selectedAngle !== null && (
+                <div className="space-y-5 animate-fade-in">
+                  <div className="space-y-3">
+                    <h3 className="text-base font-display text-foreground">Formato do Criativo</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        { value: "1:1", label: "1:1", desc: "Feed" },
+                        { value: "4:5", label: "4:5", desc: "Feed vertical" },
+                        { value: "9:16", label: "9:16", desc: "Stories/Reels" },
+                        { value: "16:9", label: "16:9", desc: "Landscape" },
+                      ].map((f) => (
+                        <div
+                          key={f.value}
+                          className={`rounded-xl p-4 border-2 cursor-pointer transition-all text-center ${
+                            format === f.value
+                              ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                              : "border-border hover:border-primary/40 bg-background/50"
+                          }`}
+                          onClick={() => setFormat(f.value)}
+                        >
+                          <span className="font-display text-foreground">{f.label}</span>
+                          <p className="text-xs text-muted-foreground mt-1">{f.desc}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
               )}
 
-              <GenerationProgress
-                isActive={loading}
-                type="copy"
-                onTimeout={() => {
-                  toast({ title: "Geração demorada", description: "A geração de copy está demorando mais que o esperado. Aguarde ou tente novamente.", variant: "destructive" });
-                }}
-              />
+              <Dialog open={generatingCreative} onOpenChange={() => {}}>
+                <DialogContent className="sm:max-w-sm [&>button]:hidden" onInteractOutside={(e) => e.preventDefault()}>
+                  <DialogHeader>
+                    <DialogTitle className="text-center">Gerando seu criativo...</DialogTitle>
+                  </DialogHeader>
+                  <GenerationProgress
+                    isActive={generatingCreative}
+                    type="creative"
+                    onTimeout={() => {
+                      toast({ title: "Geração demorada", description: "O processo está demorando mais que o esperado. Se persistir, tente novamente.", variant: "destructive" });
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
 
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-                <Button variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
-                  <ArrowLeft className="w-4 h-4" /> Voltar
+              <div className="flex gap-4 justify-center pt-4">
+                <Button variant="outline" onClick={resetWizard}>
+                  Novo Criativo
                 </Button>
-                {step < STEPS.length - 1 ? (
-                  <Button variant="hero" onClick={() => setStep(step + 1)} disabled={!canProceed()}>
-                    Próximo <ArrowRight className="w-4 h-4" />
-                  </Button>
-                ) : (
-                  <Button variant="hero" onClick={handleGenerate} disabled={loading}>
-                    {loading ? "Gerando copy..." : <><Sparkles className="w-4 h-4" /> Gerar variações de copy</>}
-                  </Button>
-                )}
+                <Button
+                  variant="hero"
+                  onClick={handleGenerateCreative}
+                  disabled={selectedAngle === null || generatingCreative}
+                >
+                  {generatingCreative ? "Gerando criativo..." : <><Sparkles className="w-4 h-4" /> Gerar Criativo</>}
+                </Button>
               </div>
             </div>
-          </>
+          ) : null
         )}
       </div>
+
+      <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingImageIdx !== null ? "Editar imagem" : "Adicionar imagem"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <ImageUpload images={dialogImage} onImagesChange={setDialogImage} maxImages={1} />
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Orientações de uso (opcional)</Label>
+              <Textarea
+                value={dialogInstruction}
+                onChange={(e) => setDialogInstruction(e.target.value)}
+                placeholder="Ex: usar como mockup em celular, destacar como produto principal, usar como background..."
+                className="resize-none text-sm"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImageDialogOpen(false)}>Cancelar</Button>
+            <Button variant="hero" onClick={handleDialogConfirm} disabled={dialogImage.length === 0}>
+              {editingImageIdx !== null ? "Salvar" : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <InsufficientCreditsDialog
         open={isCreditsDialogOpen}
         onClose={() => setIsCreditsDialogOpen(false)}

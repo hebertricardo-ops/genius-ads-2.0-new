@@ -6,9 +6,10 @@ interface ImageUploadProps {
   images: File[];
   onImagesChange: (images: File[]) => void;
   maxImages?: number;
+  inputId?: string;
 }
 
-const ImageUpload = ({ images, onImagesChange, maxImages = 4 }: ImageUploadProps) => {
+const ImageUpload = ({ images, onImagesChange, maxImages = 4, inputId = "file-upload" }: ImageUploadProps) => {
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDrop = useCallback(
@@ -53,7 +54,7 @@ const ImageUpload = ({ images, onImagesChange, maxImages = 4 }: ImageUploadProps
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        onClick={() => document.getElementById("file-upload")?.click()}
+        onClick={() => document.getElementById(inputId)?.click()}
       >
         <Upload className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
         <p className="text-foreground font-display">
@@ -63,7 +64,7 @@ const ImageUpload = ({ images, onImagesChange, maxImages = 4 }: ImageUploadProps
           ou clique para selecionar (máx. {maxImages})
         </p>
         <input
-          id="file-upload"
+          id={inputId}
           type="file"
           accept="image/*"
           multiple

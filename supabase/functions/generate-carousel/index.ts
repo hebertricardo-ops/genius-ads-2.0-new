@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 // ─── IMAGE PROVIDER TOGGLE ───
-// "fal" = fal.ai nano-banana-pro/edit (primary)
+// "fal" = fal.ai openai/gpt-image-2/edit (primary)
 // "vertex" = Vertex AI gemini-3-pro-image-preview (standby)
 const IMAGE_PROVIDER: "fal" | "vertex" = "fal";
 
@@ -85,42 +85,78 @@ async function imageUrlToBase64(url: string): Promise<{ mimeType: string; data: 
 
 // ─── FAL.AI INTEGRATION ───
 
-function buildFalPrompt(slide: any, product_name: string, creative_style: string, numSlides: number, typographyStyle: string, existingSlideUrls?: string[], useAiImage?: boolean): string {
-  const lines: string[] = [
-    `Crie um slide de carrossel publicitário no formato 1:1 (quadrado).`,
-    `Produto: ${product_name}`,
-    `Estilo visual: ${creative_style || "clean premium tecnológico"}`,
-    ``,
-    `--- CONTEÚDO DO SLIDE ---`,
-    `Slide ${slide.slide_number} de ${numSlides} — Função: ${slide.slide_role}`,
-    `Headline: ${slide.headline}`,
-    `Subtexto: ${slide.subtext}`,
-    slide.cta ? `CTA: ${slide.cta}` : "",
-    ``,
-    `--- TIPOGRAFIA (OBRIGATÓRIO) ---`,
-    `REGRA PRINCIPAL: TODOS os slides DEVEM usar EXATAMENTE a mesma fonte/estilo tipográfico.`,
-    `Estilo definido: ${typographyStyle}`,
-    `Headlines: sans-serif geométrica bold (estilo Montserrat Bold). MESMA fonte em TODOS os slides.`,
-    `Subtextos: sans-serif regular/light (estilo Montserrat Regular). MESMA fonte em TODOS os slides.`,
-    `CTA: mesma família tipográfica do headline, em bold ou semibold.`,
-    `PROIBIDO: fontes serifadas, manuscritas, cursivas ou decorativas. PROIBIDO variar a font-family entre slides.`,
-    ``,
-    `--- COMPOSIÇÃO ---`,
-    `OBRIGATÓRIO: renderizar os textos (headline, subtexto, cta) diretamente na imagem, em português do Brasil, com tipografia legível e bem posicionada.`,
-    `O headline deve ter destaque visual (maior, bold, contraste alto).`,
-    `O subtexto deve aparecer menor, abaixo do headline.`,
-    slide.cta ? `Renderizar CTA como botão ou destaque visual.` : "",
-    `Todos os textos em PORTUGUÊS DO BRASIL exatamente como fornecidos — não traduzir, não alterar.`,
-    `Design clean, premium e profissional.`,
-    `Background elaborado com elementos visuais contextuais.`,
-    `Efeitos tecnológicos: linhas geométricas, gradientes sutis, overlays.`,
-    `PROIBIDO: NÃO incluir numeração de slide (ex: 1/6, 2/8).`,
-    slide.slide_role === "gancho" ? "Visual chamativo e impactante para prender atenção." : "",
-    slide.slide_role === "cta" ? "Visual de fechamento com destaque para call-to-action." : "",
-    existingSlideUrls?.length ? "REFERÊNCIA DE ESTILO: COPIAR EXATAMENTE a mesma tipografia, paleta de cores, elementos decorativos e composição visual dos slides de referência. A fonte deve ser idêntica." : "",
-    useAiImage ? `GERAÇÃO DE IMAGEM COM IA: crie elementos visuais, ilustrações e cenários que representem o conceito do slide. Contexto: ${product_name}. Função: ${slide.slide_role}.` : "",
-  ];
-  return lines.filter(Boolean).join("\n");
+function buildFalPrompt(
+  slide: any,
+  product_name: string,
+  creative_style: string,
+  numSlides: number,
+  existingSlideUrls?: string[],
+  useAiImage?: boolean,
+  imageInstruction?: string,
+  includeLogoVisible?: boolean,
+  hasLogoReference?: boolean,
+): string {
+  const instrucoes_extras: string[] = [
+    "OBRIGATÓRIO: renderizar os textos (headline, subtexto, cta) diretamente na imagem em português do Brasil com tipografia legível e bem posicionada",
+    "a headline deve ter destaque visual: maior, bold, contraste alto, ocupar 30% a 40% da área da imagem; aplicar cor de destaque nas palavras-chave para criar hierarquia visual",
+    "o subtexto deve aparecer menor, abaixo do headline",
+    slide.cta ? "CTA renderizado como botão ou destaque visual" : "",
+    "todos os textos EXATAMENTE como fornecidos, sem tradução ou alteração",
+    "design clean, premium e profissional",
+    "garantir legibilidade em telas mobile",
+    "priorizar contraste forte entre elementos principais e fundo",
+    "background elaborado com elementos visuais contextuais que façam referência ao produto e nicho — evitar fundos de cor única ou gradientes puros; usar texturas, padrões ou elementos contextuais",
+    "incluir efeitos tecnológicos: linhas geométricas finas, gradientes sutis, elementos em transparência, overlays e formas abstratas que deem visual moderno e tecnológico",
+    "PROIBIDO: NÃO incluir numeração de slide na imagem (ex: 1/6, 2/8, slide 3 de 5)",
+    "PROIBIDO: fontes serifadas, manuscritas, cursivas ou decorativas",
+    existingSlideUrls?.length ? "REFERÊNCIA DE ESTILO: COPIAR EXATAMENTE a mesma tipografia (font-family, peso, tamanho relativo), paleta de cores, elementos decorativos e composição visual dos slides de referência fornecidos — a fonte deve ser idêntica" : "",
+    slide.slide_role === "gancho" ? "visual chamativo e impactante para prender atenção imediatamente" : "",
+    slide.slide_role === "cta" ? "visual de fechamento com destaque máximo para call-to-action" : "",
+    useAiImage ? `GERAÇÃO DE IMAGEM CONTEXTUAL: além da logomarca, gerar uma imagem fotográfica ou ilustrativa que esteja diretamente alinhada ao contexto da copy deste slide. A imagem deve reforçar visualmente a mensagem do slide e compor o layout de forma integrada. Contexto: produto "${product_name}", função do slide "${slide.slide_role}", headline "${slide.headline}", subtexto "${slide.subtext}". A imagem gerada deve ser o elemento visual principal do slide, ocupando uma área de destaque da composição, e deve parecer profissional, realista e adequada para um anúncio no Instagram/Facebook.` : "",
+    imageInstruction ? `instrução específica para uso das imagens de referência: ${imageInstruction}` : "",
+    includeLogoVisible
+      ? "LOGO DA MARCA: a ÚLTIMA imagem fornecida é o logotipo da marca — renderizar de forma PEQUENA e DISCRETA em uma das extremidades do slide (canto inferior direito ou canto inferior esquerdo). Preservar forma, cores e proporções originais exatamente — não distorcer, recolorir ou cortar o logotipo. O logotipo deve ser claramente legível mas não deve competir com o headline ou o conteúdo principal."
+      : hasLogoReference
+        ? "LOGO DA MARCA: a ÚLTIMA imagem fornecida é o logotipo da marca — usar APENAS como referência de paleta de cores e identidade visual. NÃO renderizar o logotipo visualmente neste slide."
+        : "",
+  ].filter(Boolean);
+
+  const promptObj = {
+    tipo: "slide_de_carrossel_publicitario",
+    formato: "1:1",
+    idioma_textos: "português do Brasil",
+    objetivo: "anuncio_meta_ads_carousel",
+    produto: { nome: product_name },
+    slide: {
+      numero: slide.slide_number,
+      total: numSlides,
+      funcao: slide.slide_role,
+    },
+    layout: {
+      estilo: creative_style || "clean premium tecnológico",
+      composicao: "textos sobrepostos ao visual de forma integrada e hierárquica",
+      hierarquia_visual: "headline dominante, subtexto secundário, cta em destaque",
+      distribuicao_elementos: "headline no terço superior/central, subtexto abaixo, cta no terço inferior",
+    },
+    tipografia: {
+      regra_principal: "TODOS os slides do carrossel DEVEM usar EXATAMENTE a mesma fonte/estilo tipográfico — consistência obrigatória",
+      headline: "sans-serif geométrica bold (estilo Montserrat Bold)",
+      subtexto: "sans-serif regular/light (estilo Montserrat Regular)",
+      cta: "mesma família tipográfica do headline, bold ou semibold",
+    },
+    textos: {
+      headline: slide.headline,
+      subtexto: slide.subtext,
+      cta: slide.cta || null,
+    },
+    direcao_visual: {
+      descricao: `slide ${slide.slide_number}/${numSlides} de carrossel publicitário com função "${slide.slide_role}"`,
+      atmosfera: "clean premium, conversão alta, estética realista de anúncio para Instagram/Facebook",
+    },
+    instrucoes_extras,
+  };
+
+  return JSON.stringify(promptObj, null, 2);
 }
 
 async function generateSlideWithFal(
@@ -130,24 +166,26 @@ async function generateSlideWithFal(
   const FAL_KEY = Deno.env.get("FAL_KEY");
   if (!FAL_KEY) throw new Error("FAL_KEY not configured");
 
-  const falInput: any = {
-    prompt,
-    aspect_ratio: "1:1",
-  };
-  if (referenceImageUrls.length > 0) {
-    falInput.image_urls = referenceImageUrls;
+  if (referenceImageUrls.length === 0) {
+    throw new Error("Nenhuma imagem de referência disponível. Configure a logomarca da marca ou adicione imagens de referência para gerar os slides.");
   }
 
-  console.log("[fal.ai] Calling synchronous endpoint...");
+  console.log(`[fal.ai] Calling openai/gpt-image-2/edit with ${referenceImageUrls.length} reference image(s)...`);
 
-  // Use synchronous endpoint (fal.run) instead of queue
-  const res = await fetch("https://fal.run/fal-ai/nano-banana-pro/edit", {
+  const res = await fetch("https://fal.run/openai/gpt-image-2/edit", {
     method: "POST",
     headers: {
       Authorization: `Key ${FAL_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(falInput),
+    body: JSON.stringify({
+      prompt,
+      image_urls: referenceImageUrls,
+      image_size: "square_hd",
+      quality: "medium",
+      num_images: 1,
+      output_format: "png",
+    }),
   });
 
   if (!res.ok) {
@@ -156,8 +194,6 @@ async function generateSlideWithFal(
   }
 
   const resultData = await res.json();
-
-  // Extract image URL from fal.ai response
   const imageUrl = resultData?.images?.[0]?.url || resultData?.image?.url || resultData?.output?.images?.[0]?.url;
   if (!imageUrl) {
     console.error("[fal.ai] Unexpected response structure:", JSON.stringify(resultData).substring(0, 500));
@@ -275,9 +311,9 @@ serve(async (req) => {
     if (phase === "copy") {
       return await handleCopyPhase(body);
     } else if (phase === "images") {
-      return await handleImagesPhase(body);
+      return await handleImagesPhase(body, authHeader);
     } else if (phase === "single-image") {
-      return await handleSingleImagePhase(body);
+      return await handleSingleImagePhase(body, authHeader);
     } else {
       throw new Error("Invalid phase. Must be 'copy', 'images', or 'single-image'.");
     }
@@ -343,7 +379,7 @@ Agora gere a copy completa do carrossel.`;
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-5.4-mini",
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: CAROUSEL_SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
@@ -415,7 +451,7 @@ Agora gere a copy completa do carrossel.`;
 // ═══════════════════════════════════════════════════════
 // PHASE 2: Generate images from approved copy (slow)
 // ═══════════════════════════════════════════════════════
-async function handleImagesPhase(body: any) {
+async function handleImagesPhase(body: any, authHeader: string) {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -425,11 +461,36 @@ async function handleImagesPhase(body: any) {
 
   const numSlides = copy.slides.length;
   const typographyStyle = body.typography_style || "sans-serif geométrica (Montserrat ou similar)";
+  const creditsCost: number = copy.credits_cost || numSlides;
+
+  // Extract userId from JWT
+  let userId: string | null = null;
+  try {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    userId = user?.id || null;
+  } catch { /* ignore */ }
+
+  // Check credits before generating
+  if (userId) {
+    const { data: creditData } = await supabaseAdmin
+      .from("user_credits")
+      .select("credits_balance")
+      .eq("user_id", userId)
+      .single();
+
+    if (!creditData || creditData.credits_balance < creditsCost) {
+      return new Response(
+        JSON.stringify({ error: "Créditos insuficientes" }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  }
 
   console.log(`Phase 2 (images): Generating ${numSlides} slide images via ${IMAGE_PROVIDER}...`);
 
   if (IMAGE_PROVIDER === "fal") {
-    return await handleImagesWithFal(copy, image_urls || [], product_name, creative_style, numSlides, typographyStyle, supabaseAdmin);
+    return await handleImagesWithFal(copy, image_urls || [], product_name, creative_style, numSlides, typographyStyle, supabaseAdmin, userId, creditsCost);
   } else {
     return await handleImagesWithVertex(body, copy, image_urls, product_name, creative_style, numSlides, supabaseAdmin);
   }
@@ -444,6 +505,8 @@ async function handleImagesWithFal(
   numSlides: number,
   typographyStyle: string,
   supabaseAdmin: any,
+  userId: string | null,
+  creditsCost: number,
 ) {
   const generatedSlides: Array<{ slide_number: number; image_url: string }> = [];
   const failedSlides: number[] = [];
@@ -462,11 +525,32 @@ async function handleImagesWithFal(
         }
 
         const startTime = Date.now();
-        const prompt = buildFalPrompt(slide, productName, creativeStyle, numSlides, typographyStyle);
+        const prompt = buildFalPrompt(slide, productName, creativeStyle, numSlides, undefined, false);
         const falImageUrl = await generateSlideWithFal(prompt, imageUrls);
         const storageUrl = await downloadAndUploadToStorage(falImageUrl, supabaseAdmin);
 
         generatedSlides.push({ slide_number: slide.slide_number, image_url: storageUrl });
+
+        if (userId) {
+          const { error: insertError } = await supabaseAdmin
+            .from("generated_creatives")
+            .insert({
+              user_id: userId,
+              image_url: storageUrl,
+              copy_data: {
+                headline: slide.headline,
+                body: slide.subtext,
+                cta: slide.cta,
+                slide_number: slide.slide_number,
+                slide_role: slide.slide_role,
+              },
+              credits_used: 0,
+            });
+          if (insertError) {
+            console.error(`Failed to insert slide ${slide.slide_number} into generated_creatives:`, insertError);
+          }
+        }
+
         success = true;
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
         console.log(`[fal.ai] Slide ${i + 1}/${numSlides} generated in ${elapsed}s`);
@@ -493,6 +577,27 @@ async function handleImagesWithFal(
       JSON.stringify({ error: "Todas as imagens falharam. Tente novamente em alguns minutos.", fallback: true }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+  }
+
+  // Deduct credits once after all slides generated
+  if (userId && generatedSlides.length > 0) {
+    try {
+      const { data: creditData } = await supabaseAdmin
+        .from("user_credits")
+        .select("credits_balance")
+        .eq("user_id", userId)
+        .single();
+
+      if (creditData) {
+        await supabaseAdmin
+          .from("user_credits")
+          .update({ credits_balance: creditData.credits_balance - creditsCost })
+          .eq("user_id", userId);
+        console.log(`Deducted ${creditsCost} credits from user ${userId}`);
+      }
+    } catch (e) {
+      console.error("Failed to deduct credits:", e);
+    }
   }
 
   const failedCount = copy.slides.length - generatedSlides.length;
@@ -693,22 +798,28 @@ async function handleImagesWithVertex(
 // ═══════════════════════════════════════════════════════
 // PHASE 3: Generate a SINGLE slide image (no batch)
 // ═══════════════════════════════════════════════════════
-async function handleSingleImagePhase(body: any) {
+async function handleSingleImagePhase(body: any, authHeader: string) {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  const { slide, image_urls, product_name, creative_style, total_slides, carousel_style_reference, use_ai_image, existing_slide_urls } = body;
+  const { slide, image_urls, logo_url, include_logo_visible, product_name, creative_style, total_slides, carousel_style_reference, use_ai_image, existing_slide_urls } = body;
   if (!slide || !slide.headline) throw new Error("Missing slide data");
 
-  const typographyStyle = body.typography_style || "sans-serif geométrica (Montserrat ou similar)";
+  // Extract userId from JWT
+  let userId: string | null = null;
+  try {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    userId = user?.id || null;
+  } catch { /* ignore */ }
 
-  console.log(`Single-image: Generating slide ${slide.slide_number}/${total_slides || "?"} via ${IMAGE_PROVIDER}`);
+  console.log(`Single-image: Generating slide ${slide.slide_number}/${total_slides || "?"} via ${IMAGE_PROVIDER}, logo_visible=${include_logo_visible}`);
 
   if (IMAGE_PROVIDER === "fal") {
-    return await handleSingleImageWithFal(body, slide, image_urls, product_name, creative_style, total_slides, existing_slide_urls, use_ai_image, typographyStyle, supabaseAdmin);
+    return await handleSingleImageWithFal(body, slide, image_urls, logo_url, include_logo_visible, product_name, creative_style, total_slides, existing_slide_urls, use_ai_image, supabaseAdmin, userId);
   } else {
-    return await handleSingleImageWithVertex(body, slide, image_urls, product_name, creative_style, total_slides, carousel_style_reference, use_ai_image, existing_slide_urls, typographyStyle, supabaseAdmin);
+    return await handleSingleImageWithVertex(body, slide, image_urls, product_name, creative_style, total_slides, carousel_style_reference, use_ai_image, existing_slide_urls, "", supabaseAdmin);
   }
 }
 
@@ -717,17 +828,24 @@ async function handleSingleImageWithFal(
   body: any,
   slide: any,
   imageUrls: string[],
+  logoUrl: string | undefined,
+  includeLogoVisible: boolean,
   productName: string,
   creativeStyle: string,
   totalSlides: number,
   existingSlideUrls: string[],
   useAiImage: boolean,
-  typographyStyle: string,
   supabaseAdmin: any,
+  userId: string | null,
 ) {
+  // Build reference image list: product images first, existing slides for style ref, logo last
   const allRefUrls = [...(imageUrls || [])];
   if (existingSlideUrls?.length) {
     allRefUrls.push(...existingSlideUrls.slice(0, 2));
+  }
+  const hasLogoReference = !!logoUrl;
+  if (logoUrl) {
+    allRefUrls.push(logoUrl); // logo always last — prompt references it as "última imagem"
   }
 
   let lastError = "";
@@ -740,9 +858,30 @@ async function handleSingleImageWithFal(
       }
 
       const startTime = Date.now();
-      const prompt = buildFalPrompt(slide, productName, creativeStyle, totalSlides || 1, typographyStyle, existingSlideUrls, useAiImage);
+      const imageInstruction = body.image_instruction || undefined;
+      const prompt = buildFalPrompt(slide, productName, creativeStyle, totalSlides || 1, existingSlideUrls, useAiImage, imageInstruction, includeLogoVisible, hasLogoReference);
       const falImageUrl = await generateSlideWithFal(prompt, allRefUrls);
       const storageUrl = await downloadAndUploadToStorage(falImageUrl, supabaseAdmin);
+
+      if (userId) {
+        const { error: insertError } = await supabaseAdmin
+          .from("generated_creatives")
+          .insert({
+            user_id: userId,
+            image_url: storageUrl,
+            copy_data: {
+              headline: slide.headline,
+              body: slide.subtext,
+              cta: slide.cta,
+              slide_number: slide.slide_number,
+              slide_role: slide.slide_role,
+            },
+            credits_used: 0,
+          });
+        if (insertError) {
+          console.error(`Failed to insert slide ${slide.slide_number} into generated_creatives:`, insertError);
+        }
+      }
 
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log(`[fal.ai] Slide ${slide.slide_number} generated in ${elapsed}s`);

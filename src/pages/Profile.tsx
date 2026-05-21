@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Coins, Save, Loader2 } from "lucide-react";
+import { Camera, Coins, Save, Loader2, ShoppingCart, Instagram, Facebook, Smartphone } from "lucide-react";
+import { useSocialPublish } from "@/hooks/useSocialPublish";
 
 const Profile = () => {
   const { user } = useAuth();
   const { data: credits } = useCredits();
+  const { socialProfile, isConnected, connectSocialAccounts } = useSocialPublish();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -192,24 +194,16 @@ const Profile = () => {
         {/* Credits */}
         <div className="gradient-card rounded-2xl border border-border shadow-card p-6 animate-fade-in">
           <h3 className="font-display text-foreground mb-4">Créditos</h3>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                <Coins className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-display text-foreground">
-                  {credits?.credits_balance ?? 0}
-                </p>
-                <p className="text-sm text-muted-foreground">créditos disponíveis</p>
-              </div>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+              <Coins className="w-6 h-6 text-primary" />
             </div>
-            <Button variant="hero" onClick={() => {
-              toast({ title: "Em breve!", description: "A recarga de créditos estará disponível em breve." });
-            }}>
-              <Coins className="w-4 h-4" />
-              Recarregar
-            </Button>
+            <div>
+              <p className="text-2xl font-display text-foreground">
+                {credits?.credits_balance ?? 0}
+              </p>
+              <p className="text-sm text-muted-foreground">créditos disponíveis</p>
+            </div>
           </div>
           <div className="mt-4 pt-4 border-t border-border">
             <p className="text-sm text-muted-foreground">
@@ -217,6 +211,98 @@ const Profile = () => {
             </p>
           </div>
         </div>
+
+        {/* Social networks */}
+        <div className="gradient-card rounded-2xl border border-border shadow-card p-6 animate-fade-in">
+          <div className="flex items-center gap-2 mb-4">
+            <Smartphone className="w-4 h-4 text-primary" />
+            <h3 className="font-display text-foreground">Redes Sociais</h3>
+          </div>
+          {!isConnected ? (
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="flex items-center gap-2 flex-1 px-4 py-3 rounded-xl border border-border bg-muted/30">
+                  <Instagram className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Instagram</span>
+                </div>
+                <div className="flex items-center gap-2 flex-1 px-4 py-3 rounded-xl border border-border bg-muted/30">
+                  <Facebook className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Facebook</span>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Conecte suas redes para publicar criativos diretamente pelo Genius ADS.
+              </p>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try { await connectSocialAccounts(); }
+                  catch (err: any) { toast({ title: "Erro ao conectar", description: err.message, variant: "destructive" }); }
+                }}
+              >
+                <Smartphone className="w-4 h-4" /> Conectar redes sociais
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-500 text-xs font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                  Conectado
+                </span>
+              </div>
+              <div className="flex gap-3">
+                {["instagram", "facebook"].map((p) => {
+                  const connected = socialProfile?.connected_platforms?.includes(p) ?? false;
+                  const Icon = p === "instagram" ? Instagram : Facebook;
+                  const color = p === "instagram" ? "text-pink-500" : "text-blue-500";
+                  const label = p === "instagram" ? "Instagram" : "Facebook";
+                  return (
+                    <div
+                      key={p}
+                      className={`flex items-center gap-2 flex-1 px-4 py-3 rounded-xl border ${connected ? "border-primary/40 bg-primary/5" : "border-border bg-muted/30"}`}
+                    >
+                      <Icon className={`w-5 h-5 ${connected ? color : "text-muted-foreground"}`} />
+                      <span className={`text-sm font-medium ${connected ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try { await connectSocialAccounts(); }
+                  catch (err: any) { toast({ title: "Erro ao gerenciar", description: err.message, variant: "destructive" }); }
+                }}
+              >
+                <Smartphone className="w-4 h-4" /> Gerenciar conexões
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Buy credits — shown only when balance is zero */}
+        {(credits?.credits_balance ?? 1) === 0 && (
+          <div className="gradient-card rounded-2xl border border-primary/40 shadow-card p-6 animate-fade-in">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+                <ShoppingCart className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-display text-foreground mb-1">Seus créditos acabaram</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Adquira um pacote de créditos para continuar gerando criativos e carrosséis.
+                </p>
+                <Button variant="hero" onClick={() => {
+                  toast({ title: "Em breve!", description: "A compra de créditos estará disponível em breve." });
+                }}>
+                  <ShoppingCart className="w-4 h-4" />
+                  Comprar créditos
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

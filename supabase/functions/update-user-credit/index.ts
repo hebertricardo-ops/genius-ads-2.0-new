@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-webhook-secret",
+    "authorization, x-client-info, apikey, content-type",
 };
 
 const CREDITS_MAP: Record<string, number> = {
@@ -19,13 +19,14 @@ serve(async (req) => {
   }
 
   try {
-    const webhookSecret = req.headers.get("x-webhook-secret");
-    const expectedSecret = Deno.env.get("WEBHOOK_SECRET");
-    if (!expectedSecret || webhookSecret !== expectedSecret) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
+    const authHeader = req.headers.get("Authorization");
+    const secret = Deno.env.get("WEBHOOK_SECRET");
+
+    if (!secret || authHeader !== `Bearer ${secret}`) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     const { email, packageId } = await req.json();

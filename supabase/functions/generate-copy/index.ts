@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
 const systemPrompt = `Você é um copywriter de elite, especialista em criativos estáticos de alta conversão para Meta Ads (Facebook e Instagram). Você gera copies em português do Brasil.
 
@@ -13,7 +13,7 @@ REGRAS OBRIGATÓRIAS:
 - Headline com gancho forte e impactante
 - Linguagem clara, persuasiva e direta — nada genérico
 - Foco total em conversão
-- CTA coerente com o que o usuário informou
+- CTA: o texto exato do CTA informado pelo usuário DEVE aparecer integralmente no campo cta. Você pode adicionar uma frase curta de gatilho (urgência ou curiosidade) antes ou depois, mas nunca substituir, parafrasear ou omitir o CTA original. Exemplo: se o usuário informou "Clique em Saiba Mais", o campo cta deve conter "Clique em Saiba Mais" literalmente.
 - Textos curtos — pense em criativo estático de anúncio, não em artigo
 - Subheadline é opcional — use apenas quando agregar valor
 - Todas as copies em português do Brasil
@@ -25,40 +25,29 @@ DISTRIBUIÇÃO ESTRATÉGICA DOS 3 ÂNGULOS:
 
 Cada ângulo deve ser genuinamente diferente dos outros em abordagem e tom.
 
-OPÇÕES VISUAIS POR ÂNGULO:
-Para cada ângulo, gere 2 VARIAÇÕES de conceito visual clean premium para o criativo estático:
-- Variação A1: layout clean e premium — design sofisticado, minimalista e elegante, com composição equilibrada e uso refinado de espaço negativo
-- Variação A2: layout clean e premium — igualmente sofisticado, porém com mais elementos gráficos, texturas e destaques visuais que enriquecem a composição mantendo a elegância
+CONCEITO VISUAL POR ÂNGULO:
+Para cada ângulo, gere 1 CONCEITO VISUAL premium e harmonioso para o criativo estático.
+O conceito deve ser rico em elementos gráficos e sofisticado, porém sempre equilibrado — visual impactante sem poluição.
 
-Ambas as variações devem manter o padrão premium e sofisticado. A diferença está na abordagem visual (mais minimalista vs mais rica em elementos), NÃO no tom da copy.
-
-REGRA IMPORTANTE PARA AMBAS AS VARIAÇÕES:
-- Identifique o produto, nicho e suas características
-- Inclua elementos visuais temáticos (ícones, figurinhas, badges, selos) que estejam alinhados com o produto e nicho do anúncio
-- Esses elementos devem reforçar a identidade do nicho e tornar o criativo mais contextualizado e profissional
-- Exemplos: nicho fitness → ícones de halteres, chamas, troféus; nicho beleza → elementos florais, brilhos; nicho educação → livros, lâmpadas, estrelas
-
-Cada opção visual deve conter orientações de:
-- Descrição curta da linha visual
-- Distribuição sugerida dos elementos no criativo
-- Orientação de composição
-- Proposta de hierarquia visual
-- Estilo do layout
-- Como destacar o CTA visualmente
-- Elementos temáticos sugeridos (ícones/figurinhas alinhados ao nicho)`;
+PRINCÍPIOS OBRIGATÓRIOS DO CONCEITO VISUAL:
+- Design premium com hierarquia visual clara e composição equilibrada
+- Rico em elementos gráficos temáticos, mas cada elemento tem propósito — sem excesso
+- Identifique o produto e nicho para sugerir elementos visuais alinhados (ícones, badges, selos, texturas, partículas)
+- O CTA deve ser destacado com botão, faixa ou elemento visual chamativo
+- Exemplos por nicho: fitness → halteres, chamas, troféus; beleza → florais, brilhos, pétalas; educação → livros, lâmpadas, estrelas; tech → circuitos, partículas, gradientes; alimentação → ingredientes, vapor, texturas orgânicas`;
 
 const tools = [
   {
     type: "function",
     function: {
       name: "generate_copies",
-      description: "Return 3 ad copy angles, each with 2 visual concept options",
+      description: "Return 3 ad copy angles, each with exactly 1 visual concept",
       parameters: {
         type: "object",
         properties: {
           angles: {
             type: "array",
-            description: "3 different copy angles",
+            description: "Exatamente 3 ângulos de copy, cada um com 1 conceito visual",
             items: {
               type: "object",
               properties: {
@@ -66,32 +55,28 @@ const tools = [
                 headline: { type: "string", description: "Gancho forte e impactante" },
                 subheadline: { type: "string", description: "Complemento opcional da headline" },
                 body: { type: "string", description: "Corpo curto e persuasivo" },
-                cta: { type: "string", description: "Chamada para ação" },
-                visual_options: {
-                  type: "array",
-                  description: "2 opções de conceito visual para este ângulo",
-                  items: {
-                    type: "object",
-                    properties: {
-                      option_label: { type: "string", description: "Ex: Variação A1 - Minimalista Premium ou Variação A2 - Premium Rico em Elementos" },
-                      visual_description: { type: "string", description: "Mini descrição da linha visual" },
-                      element_distribution: { type: "string", description: "Distribuição sugerida dos elementos no criativo" },
-                      composition: { type: "string", description: "Orientação de composição" },
-                      visual_hierarchy: { type: "string", description: "Proposta de hierarquia visual" },
-                      layout_style: { type: "string", description: "Estilo do layout" },
-                      cta_highlight: { type: "string", description: "Como destacar o CTA visualmente" },
-                      thematic_elements: { type: "string", description: "Ícones, figurinhas, badges ou selos temáticos alinhados ao produto e nicho" },
-                    },
-                    required: ["option_label", "visual_description", "element_distribution", "composition", "visual_hierarchy", "layout_style", "cta_highlight", "thematic_elements"],
+                cta: { type: "string", description: "Chamada para ação — DEVE conter o texto exato do CTA informado pelo usuário. Pode adicionar frase de gatilho antes ou depois, mas nunca alterar ou omitir o CTA original." },
+                visual_concept: {
+                  type: "object",
+                  description: "Conceito visual premium e harmonioso para este ângulo",
+                  properties: {
+                    visual_description: { type: "string", description: "Descrição geral da linha visual e atmosfera do criativo" },
+                    element_distribution: { type: "string", description: "Como os elementos (texto, produto, ícones) se distribuem no layout" },
+                    composition: { type: "string", description: "Orientação de composição e uso do espaço" },
+                    visual_hierarchy: { type: "string", description: "Ordem visual: o que o olhar vê primeiro, segundo e terceiro" },
+                    layout_style: { type: "string", description: "Estilo e atmosfera do layout (cores, fundos, texturas)" },
+                    cta_highlight: { type: "string", description: "Como o CTA é destacado visualmente" },
+                    thematic_elements: { type: "string", description: "Ícones, badges, selos ou elementos temáticos alinhados ao produto e nicho — com propósito, sem excesso" },
                   },
+                  required: ["visual_description", "element_distribution", "composition", "visual_hierarchy", "layout_style", "cta_highlight", "thematic_elements"],
                 },
               },
-              required: ["angle_name", "headline", "body", "cta", "visual_options"],
+              required: ["angle_name", "headline", "body", "cta", "visual_concept"],
             },
           },
           ad_captions: {
             type: "array",
-            description: "3 opções de legenda para o anúncio/postagem, cada uma com gancho, desenvolvimento e CTA",
+            description: "3 opções de legenda para o anúncio/postagem",
             items: {
               type: "object",
               properties: {
@@ -107,24 +92,24 @@ const tools = [
   },
 ];
 
-async function callAI(model: string, userPrompt: string, timeoutMs: number) {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+async function callOpenAI(model: string, effectiveSystemPrompt: string, userPrompt: string, timeoutMs: number) {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not configured");
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(AI_GATEWAY_URL, {
+    const response = await fetch(OPENAI_API_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: effectiveSystemPrompt },
           { role: "user", content: userPrompt },
         ],
         tools,
@@ -137,14 +122,10 @@ async function callAI(model: string, userPrompt: string, timeoutMs: number) {
 
     if (!response.ok) {
       const t = await response.text();
-      console.error(`AI error (${model}):`, response.status, t);
-      if (response.status === 429) {
-        return { error: "Rate limit exceeded. Try again shortly.", status: 429 };
-      }
-      if (response.status === 402) {
-        return { error: "Credits exhausted.", status: 402 };
-      }
-      throw new Error(`AI gateway error (${response.status})`);
+      console.error(`OpenAI error (${model}):`, response.status, t);
+      if (response.status === 429) return { error: "Rate limit exceeded. Try again shortly.", status: 429 };
+      if (response.status === 402) return { error: "Credits exhausted.", status: 402 };
+      throw new Error(`OpenAI API error (${response.status})`);
     }
 
     const data = await response.json();
@@ -166,37 +147,40 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { product_name, promise, pains, benefits, objections, cta } = await req.json();
+    const { product_name, promise, pains, benefits, objections, cta, creative_style, additional_instructions } = await req.json();
 
-    const userPrompt = `Gere 3 ângulos de copy com 2 opções visuais cada para o seguinte produto:
+    // Inject additional_instructions into system prompt as top-priority rule
+    const effectiveSystemPrompt = additional_instructions
+      ? `${systemPrompt}\n\n⚠️ INSTRUÇÃO PRIORITÁRIA DO USUÁRIO — DEVE SER APLICADA EM TODOS OS ÂNGULOS, COPIES E CONCEITOS VISUAIS:\n"${additional_instructions}"\nEsta instrução prevalece sobre qualquer outra diretriz. Não ignore. Não adapte. Aplique literalmente.`
+      : systemPrompt;
+
+    const userPrompt = `${additional_instructions ? `⚠️ ATENÇÃO — INSTRUÇÃO PRIORITÁRIA: "${additional_instructions}"\nAplique esta instrução em TODOS os ângulos de copy e conceitos visuais antes de qualquer outra consideração.\n\n` : ""}Gere 3 ângulos de copy, cada um com 1 conceito visual premium, para o seguinte produto:
 
 Produto: ${product_name}
 Promessa: ${promise}
 Dores: ${pains}
 Benefícios: ${benefits}
 Objeções: ${objections || "Nenhuma informada"}
-CTA base informado pelo usuário: ${cta || "Compre agora"}
+CTA base: ${cta || "Compre agora"}
+${creative_style ? `Estilo visual desejado: ${creative_style}` : ""}
 
-REGRA DE CTA: Use o CTA informado pelo usuário como ponto de partida e reescreva-o incluindo uma frase que desperte gatilho de urgência ou curiosidade. Ex: se o CTA base for "Saiba Mais", o CTA final pode ser "Saiba Mais Antes que Acabe" ou "Descubra o Segredo — Saiba Mais".
+⚠️ REGRA DE CTA — OBRIGATÓRIA: O texto "${cta || "Compre agora"}" deve aparecer EXATAMENTE e INTEGRALMENTE no campo cta de cada ângulo. Você pode complementar com uma frase curta de gatilho (urgência ou curiosidade) posicionada antes ou depois, mas o texto original NÃO pode ser alterado, substituído ou parafraseado. Exemplos válidos: "Só hoje! ${cta || "Compre agora"}" ou "${cta || "Compre agora"} — vagas limitadas". Exemplos INVÁLIDOS: qualquer versão que não contenha "${cta || "Compre agora"}" literalmente.
 
-REGRA DE LEGENDAS: Além dos ângulos, gere também 3 opções de legenda para o anúncio/postagem. Cada legenda deve seguir a estrutura: 1) Gancho forte (primeira linha que prende atenção), 2) Desenvolvimento persuasivo (2-3 frases curtas), 3) CTA final. As legendas devem ser variadas em tom e abordagem, baseadas nas informações do produto. Máximo de 280 caracteres por legenda.`;
+REGRA DE LEGENDAS: Gere também 3 opções de legenda. Estrutura: 1) Gancho forte, 2) Desenvolvimento persuasivo (2-3 frases curtas), 3) CTA final. Máximo 280 caracteres por legenda.${additional_instructions ? `\n\nLEMBRETE FINAL: A instrução prioritária "${additional_instructions}" deve estar refletida em todos os elementos gerados.` : ""}`;
 
-    // Try primary model with 90s timeout
     let response;
     try {
-      console.log("Attempting with openai/gpt-5-mini...");
-      response = await callAI("openai/gpt-5-mini", userPrompt, 90000);
+      console.log("Attempting with gpt-4o-mini...");
+      response = await callOpenAI("gpt-4o-mini", effectiveSystemPrompt, userPrompt, 90000);
     } catch (e) {
       if (e.message === "TIMEOUT") {
-        // Fallback to faster model
-        console.log("Primary model timed out, retrying with google/gemini-2.5-flash...");
-        response = await callAI("google/gemini-2.5-flash", userPrompt, 120000);
+        console.log("Primary model timed out, retrying with gpt-4o...");
+        response = await callOpenAI("gpt-4o", effectiveSystemPrompt, userPrompt, 120000);
       } else {
         throw e;
       }
     }
 
-    // Handle rate limit / credits errors
     if (response.error) {
       return new Response(JSON.stringify({ error: response.error }), {
         status: response.status,

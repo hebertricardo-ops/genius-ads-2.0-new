@@ -36,7 +36,7 @@ const InsufficientCreditsDialog = ({ open, onClose, creditsNeeded, creditsAvaila
               <span className="font-semibold text-destructive">{creditsAvailable}</span>
             </div>
             <p>
-              Recarregue seus créditos para continuar gerando seus criativos.
+              Adquira um pacote de créditos para continuar gerando seus criativos.
             </p>
           </DialogDescription>
         </DialogHeader>
@@ -44,8 +44,8 @@ const InsufficientCreditsDialog = ({ open, onClose, creditsNeeded, creditsAvaila
           <Button variant="outline" onClick={onClose}>
             Voltar
           </Button>
-          <Button variant="hero" onClick={() => { onClose(); navigate("/dashboard"); }}>
-            Recarregar Créditos
+          <Button variant="hero" onClick={() => { onClose(); navigate("/profile"); }}>
+            Ver opções de créditos
           </Button>
         </DialogFooter>
       </DialogContent>

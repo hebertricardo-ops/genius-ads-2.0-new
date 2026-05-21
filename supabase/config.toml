@@ -1,4 +1,19 @@
-project_id = "uwdamluyqtnseyalopon"
+project_id = "lovhzzlmuhjtbblnstfw"
 
 [functions.process-email-queue]
 verify_jwt = true
+
+[functions.generate-carousel]
+verify_jwt = false
+
+[functions.generate-creative]
+verify_jwt = false
+
+[functions.generate-copy]
+verify_jwt = false
+
+[functions.create-user-webhook]
+verify_jwt = false
+
+[functions.update-user-credit]
+verify_jwt = false

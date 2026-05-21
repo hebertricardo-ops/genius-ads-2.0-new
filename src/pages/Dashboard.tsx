@@ -1,25 +1,30 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Plus, Sparkles, ArrowRight, Lightbulb, ImageIcon } from "lucide-react";
+import { Sparkles, ArrowRight, Lightbulb, ImageIcon, Building2, Images, CalendarDays, Plus, Clock, LayoutGrid } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useCredits } from "@/hooks/useCredits";
+import { useBrandContext } from "@/contexts/BrandContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek, subDays } from "date-fns";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
+import { cn } from "@/lib/utils";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: credits } = useCredits();
+  const { selectedBrand, isLoading: brandLoading } = useBrandContext();
+  const hasBrand = !!selectedBrand;
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("name")
+        .select("name, avatar_url")
         .eq("user_id", user!.id)
         .maybeSingle();
       if (error) throw error;
@@ -29,47 +34,157 @@ const Dashboard = () => {
   });
 
   const displayName = profile?.name || user?.user_metadata?.name || user?.email?.split("@")[0] || "usuário";
+  const firstName = displayName.split(" ")[0];
   const initials = displayName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
 
-  const avatarUrl = user
-    ? supabase.storage.from("creative-uploads").getPublicUrl(`${user.id}/avatar.png`).data.publicUrl
-    : null;
+  const avatarUrl = profile?.avatar_url ?? null;
 
   const { data: recentCreatives = [] } = useQuery({
-    queryKey: ["recent-creatives", user?.id],
+    queryKey: ["recent-creatives", user?.id, selectedBrand?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("generated_creatives")
         .select("*, creative_requests(product_name)")
         .order("created_at", { ascending: false })
-        .limit(6);
+        .limit(30);
+      if (selectedBrand) q = q.eq("brand_id", selectedBrand.id);
+      const { data, error } = await q;
       if (error) throw error;
-      return data;
+
+      const seenCarousels = new Set<string>();
+      const deduped: any[] = [];
+      for (const item of data ?? []) {
+        if (!item.request_id && !item.carousel_request_id) continue;
+        if (item.carousel_request_id) {
+          if (seenCarousels.has(item.carousel_request_id)) continue;
+          seenCarousels.add(item.carousel_request_id);
+        }
+        deduped.push(item);
+        if (deduped.length === 6) break;
+      }
+      return deduped;
     },
-    enabled: !!user,
+    enabled: !!user && !!selectedBrand,
   });
 
   const { data: totalCreatives = 0 } = useQuery({
-    queryKey: ["total-creatives", user?.id],
+    queryKey: ["total-creatives", user?.id, selectedBrand?.id],
     queryFn: async () => {
-      const { count, error } = await supabase
+      let q = supabase
         .from("generated_creatives")
         .select("*", { count: "exact", head: true });
+      if (selectedBrand) q = q.eq("brand_id", selectedBrand.id);
+      const { count, error } = await q;
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!user && !!selectedBrand,
+  });
+
+  const { data: pautasCount = 0 } = useQuery({
+    queryKey: ["pautas-count", user?.id, selectedBrand?.id],
+    queryFn: async () => {
+      const since = subDays(new Date(), 30).toISOString().split("T")[0];
+      let q = (supabase as any)
+        .from("content_calendar")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user!.id)
+        .gte("scheduled_date", since);
+      if (selectedBrand?.id) q = q.eq("brand_id", selectedBrand.id);
+      const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
     },
     enabled: !!user,
   });
 
+  const { data: agendadosCount = 0 } = useQuery({
+    queryKey: ["agendados-count", user?.id, selectedBrand?.id],
+    queryFn: async () => {
+      const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 }).toISOString().split("T")[0];
+      const weekEnd = endOfWeek(new Date(), { weekStartsOn: 0 }).toISOString().split("T")[0];
+      let q = (supabase as any)
+        .from("content_calendar")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user!.id)
+        .eq("status", "scheduled")
+        .gte("scheduled_date", weekStart)
+        .lte("scheduled_date", weekEnd);
+      if (selectedBrand?.id) q = q.eq("brand_id", selectedBrand.id);
+      const { count, error } = await q;
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!user,
+  });
+
+  const { data: subscription } = useQuery({
+    queryKey: ["subscription", user?.id],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("subscriptions")
+        .select("*, plans(name)")
+        .eq("user_id", user!.id)
+        .eq("status", "active")
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const planName: string = subscription?.plans?.name ?? "Gratuito";
+  const creditsBalance = credits?.credits_balance ?? 0;
+
+  const stats = [
+    {
+      label: "CRIATIVOS",
+      value: totalCreatives,
+      sub: "na biblioteca",
+      icon: ImageIcon,
+      iconColor: "text-blue-400",
+    },
+    {
+      label: "POSTADOS",
+      value: pautasCount,
+      sub: "últimos 30 dias",
+      icon: LayoutGrid,
+      iconColor: "text-purple-400",
+    },
+    {
+      label: "AGENDADOS",
+      value: agendadosCount,
+      sub: "para esta semana",
+      icon: Clock,
+      iconColor: "text-amber-400",
+    },
+    {
+      label: "CRÉDITOS IA",
+      value: creditsBalance,
+      sub: planName,
+      icon: Sparkles,
+      iconColor: "text-primary",
+      showBar: true,
+    },
+  ];
+
   const CreativeCard = ({ item, index }: { item: any; index: number }) => {
     const productName = item.creative_requests?.product_name || "Criativo";
+    const isCarousel = !item.request_id && !!item.carousel_request_id;
+
+    const handleClick = () => {
+      if (item.request_id) {
+        navigate(`/results/${item.request_id}`);
+      } else if (item.carousel_request_id) {
+        navigate(`/carousel-results/${item.carousel_request_id}`);
+      }
+    };
+
     return (
       <div
         className="group rounded-xl overflow-hidden border border-border shadow-card animate-fade-in cursor-pointer bg-secondary/30"
         style={{ animationDelay: `${index * 80}ms` }}
-        onClick={() => navigate(`/results/${item.request_id}`)}
+        onClick={handleClick}
       >
-        {/* Image container — object-contain so full creative is always visible */}
         <div className="aspect-square bg-black/40 flex items-center justify-center overflow-hidden">
           <img
             src={item.image_url}
@@ -77,11 +192,18 @@ const Dashboard = () => {
             className="max-w-full max-h-full object-contain transition-transform duration-500 group-hover:scale-105"
           />
         </div>
-        {/* Info bar — always visible, never overlaps the image */}
         <div className="p-3 flex flex-col gap-1 border-t border-border">
-          <span className="text-foreground font-display text-sm font-medium truncate">
-            {productName}
-          </span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-foreground font-display text-sm font-medium truncate">
+              {productName}
+            </span>
+            {isCarousel && (
+              <span className="inline-flex items-center gap-1 shrink-0 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium">
+                <Images className="w-2.5 h-2.5" />
+                Carrossel
+              </span>
+            )}
+          </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground text-xs">
               {format(new Date(item.created_at), "dd/MM/yyyy")}
@@ -98,66 +220,116 @@ const Dashboard = () => {
 
   return (
     <div>
-      <div className="max-w-5xl mx-auto px-4 py-10">
-        {/* Header */}
-        <div className="mb-10 animate-fade-in flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigate("/profile")} className="cursor-pointer">
-              <Avatar className="w-14 h-14 border-2 border-border hover:border-primary transition-colors">
-                {avatarUrl ? (
-                  <AvatarImage src={avatarUrl} alt={displayName} />
-                ) : null}
-                <AvatarFallback className="bg-primary/20 text-primary text-lg font-display">
+      <div className="max-w-5xl mx-auto px-4 py-8">
+
+        {/* ── Top bar ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 animate-fade-in">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate("/profile")} className="cursor-pointer shrink-0">
+              <Avatar className="w-11 h-11 border-2 border-border hover:border-primary transition-colors">
+                {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
+                <AvatarFallback className="bg-primary/20 text-primary font-display">
                   {initials}
                 </AvatarFallback>
               </Avatar>
             </button>
             <div>
-              <h1 className="text-3xl md:text-4xl font-display text-foreground mb-1">
-                Olá, {displayName} 👋
-              </h1>
-              <p className="text-xl md:text-2xl text-muted-foreground">
-                Pronto para criar anúncios que convertem?
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-display text-foreground">Dashboard</h1>
+                {hasBrand && (
+                  <Badge variant="outline" className="border-primary/50 text-primary bg-primary/10 font-display font-normal gap-1 text-xs hidden sm:flex">
+                    <Building2 className="w-3 h-3" />
+                    {selectedBrand!.name}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Olá, {firstName} 👋 Pronto para criar posts e anúncios que convertem?
               </p>
             </div>
           </div>
-          <Button variant="hero" size="lg" onClick={() => navigate("/create")}>
-            <Plus className="w-5 h-5" />
-            Novo Criativo
-            <ArrowRight className="w-4 h-4" />
-          </Button>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => navigate("/calendario")} className="gap-1.5">
+              <CalendarDays className="w-4 h-4" />
+              Agendamento
+            </Button>
+            <Button variant="hero" size="sm" onClick={() => navigate("/create")} className="gap-1.5">
+              <Plus className="w-4 h-4" />
+              Criar Post
+            </Button>
+          </div>
         </div>
 
-        {/* Stats + Dica Pro */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-          {[
-            { icon: Sparkles, label: "Créditos disponíveis", value: String(credits?.credits_balance ?? 0), color: "text-primary" },
-            { icon: ImageIcon, label: "Criativos gerados", value: String(totalCreatives), color: "text-foreground" },
-          ].map(({ icon: Icon, label, value, color }) => (
-            <div key={label} className="gradient-card rounded-xl p-5 border border-border shadow-card animate-fade-in">
-              <div className="flex items-center gap-3 mb-2">
-                <Icon className={`w-5 h-5 ${color}`} />
-                <span className="text-sm text-muted-foreground">{label}</span>
+        {/* Banner: sem marca selecionada */}
+        {!hasBrand && !brandLoading && (
+          <div className="mb-6 rounded-2xl border border-primary/40 bg-primary/5 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4 text-primary" />
               </div>
-              <span className={`text-2xl font-display ${color}`}>{value}</span>
+              <div>
+                <h3 className="font-display text-foreground">Configure sua marca</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Defina a identidade da sua marca para que a IA gere criativos alinhados ao seu negócio.
+                </p>
+              </div>
+            </div>
+            <Button variant="hero" size="sm" onClick={() => navigate("/brands/new")} className="shrink-0">
+              Configurar Minha Marca
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* ── Stats cards ── */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 animate-fade-in">
+          {stats.map(({ label, value, sub, icon: Icon, iconColor, showBar }) => (
+            <div key={label} className="gradient-card rounded-2xl border border-border shadow-card p-4 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                  {label}
+                </span>
+                <Icon className={cn("w-4 h-4", iconColor)} />
+              </div>
+              <span className="text-3xl font-display text-foreground">{value}</span>
+              {showBar && (
+                <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{ width: `${Math.min(100, (Number(value) / 10) * 100)}%` }}
+                  />
+                </div>
+              )}
+              <span className="text-xs text-muted-foreground">{sub}</span>
             </div>
           ))}
-          <div className="rounded-xl p-5 border border-primary/40 bg-primary/5 animate-fade-in">
-            <div className="flex items-center gap-2 mb-2">
-              <Lightbulb className="w-5 h-5 text-primary" />
-              <span className="font-display text-primary">Dica Pro</span>
-            </div>
+        </div>
+
+        {/* ── Dica Pro ── */}
+        <div className="mb-6 rounded-2xl border border-primary/30 bg-primary/5 p-4 flex items-start gap-3 animate-fade-in">
+          <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+            <Lightbulb className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-display text-primary mb-0.5">Dica Pro</p>
             <p className="text-sm text-muted-foreground">
               Seja específico nas dores do seu cliente. A IA gera melhores ângulos quando entende o problema real.
             </p>
           </div>
         </div>
 
-        {/* Portfólio - Histórico */}
+        {/* ── Histórico recente ── */}
         <div className="gradient-card rounded-2xl border border-border shadow-card overflow-hidden">
-          <div className="p-6 border-b border-border">
-            <h2 className="text-lg font-display text-foreground">Histórico recente</h2>
-            <p className="text-sm text-muted-foreground">Seus últimos criativos gerados</p>
+          <div className="p-6 border-b border-border flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-display text-foreground">Histórico recente</h2>
+              <p className="text-sm text-muted-foreground">Seus últimos criativos gerados</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate("/history")} className="text-xs gap-1.5">
+              Ver tudo
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
           </div>
 
           {recentCreatives.length === 0 ? (
@@ -166,7 +338,7 @@ const Dashboard = () => {
             </div>
           ) : (
             <>
-              {/* Desktop: grid 3×2 */}
+              {/* Desktop: grid */}
               <div className="hidden sm:grid grid-cols-2 md:grid-cols-3 gap-4 p-6">
                 {recentCreatives.map((item: any, i: number) => (
                   <CreativeCard key={item.id} item={item} index={i} />
@@ -190,6 +362,7 @@ const Dashboard = () => {
             </>
           )}
         </div>
+
       </div>
     </div>
   );

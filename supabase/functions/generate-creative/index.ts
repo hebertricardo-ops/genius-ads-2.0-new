@@ -7,25 +7,27 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const FORMAT_TO_RATIO: Record<string, string> = {
-  "1:1": "1:1",
-  "4:5": "4:5",
-  "9:16": "9:16",
-  "16:9": "16:9",
+const FORMAT_TO_IMAGE_SIZE: Record<string, string> = {
+  "1:1": "square_hd",
+  "4:5": "portrait_4_3",
+  "9:16": "portrait_16_9",
+  "16:9": "landscape_16_9",
 };
 
 function buildPrompt(data: {
   product_name: string;
-  format: string;
-  promise: string;
-  pains: string;
-  benefits: string;
+  promise?: string;
+  pains?: string;
+  benefits?: string;
   objections?: string;
+  format: string;
   headline: string;
   body: string;
   cta: string;
   color_palette?: string[];
+  has_logo?: boolean;
   additional_instructions?: string;
+  image_instructions?: string[];
   visual_option: {
     visual_description: string;
     element_distribution: string;
@@ -36,107 +38,110 @@ function buildPrompt(data: {
     thematic_elements?: string;
   };
 }): string {
-  const benefitsList = data.benefits
-    .split(/\r?\n|,|;/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const { visual_option: vo } = data;
 
-  const painList = data.pains
-    .split(/\r?\n|,|;/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const toLines = (text?: string) =>
+    text ? text.split("\n").map(l => l.trim()).filter(Boolean) : [];
 
-  const objectionsList = (data.objections || "")
-    .split(/\r?\n|,|;/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  // imagens_referencia block
+  const imagens_referencia: Record<string, string> = {
+    instrucao: "usar as imagens fornecidas como base principal da composição, preservando identidade visual e contexto da marca/produto, sempre priorizar layout da marca",
+  };
+  if (data.has_logo) {
+    imagens_referencia.logo = "A ÚLTIMA imagem fornecida é o logotipo da marca — deve aparecer na composição final em posição proeminente (ex: topo-esquerda, topo-direita ou centro-inferior). Preservar forma, cores e proporções originais exatamente — não distorcer, recolorir ou cortar.";
+  }
+  if (data.image_instructions && data.image_instructions.some(i => i.trim())) {
+    imagens_referencia.instrucoes_por_imagem = data.image_instructions
+      .map((inst, idx) =>
+        `imagem ${idx + 1}: ${inst.trim() || "usar como foto do produto na composição principal"}`
+      )
+      .join("; ");
+  }
 
-  return JSON.stringify(
-    {
-      tipo: "criativo_publicitario_estatico",
-      formato: data.format,
-      idioma_textos: "português do Brasil",
-      objetivo: "anuncio_meta_ads",
-      produto: {
-        nome: data.product_name,
-        promessa: data.promise,
-      },
-      conceito_criativo: {
-        angulo: data.headline,
-        dor_principal: painList,
-        beneficios: benefitsList,
-        objecoes_trabalhadas: objectionsList,
-      },
-      imagens_referencia: {
-        instrucao:
-          "usar as imagens fornecidas como base principal da composição, preservando identidade visual e contexto do produto/oferta",
-      },
-      layout: {
-        estilo: data.visual_option.layout_style,
-        composicao: data.visual_option.composition,
-        hierarquia_visual: data.visual_option.visual_hierarchy,
-        distribuicao_elementos: data.visual_option.element_distribution,
-        destaque_cta: data.visual_option.cta_highlight,
-      },
-      textos: {
-        headline: data.headline,
-        subheadline: data.body,
-        cta: data.cta,
-      },
-      direcao_visual: {
-        descricao: data.visual_option.visual_description,
-        atmosfera:
-          "clean premium, conversão alta, estética realista de anúncio para Instagram/Facebook",
-      },
-      instrucoes_extras: [
-        "manter design clean, premium e informativo",
-        "garantir legibilidade em telas mobile",
-        "priorizar contraste forte entre elementos principais e fundo",
-        "usar as imagens de referência como elementos centrais da composição",
-        "não adicionar texto renderizado na imagem; apenas compor o visual",
-        "evitar poluição visual e manter acabamento profissional",
-        "criar background elaborado com elementos visuais que façam referência ao produto e nicho, evitar fundos de cor única — usar texturas, gradientes, padrões ou elementos contextuais",
-        "incluir efeitos tecnológicos como linhas geométricas finas, gradientes sutis, elementos em transparência, overlays e formas abstratas que deem um visual moderno e tecnológico ao criativo",
-        ...(data.color_palette && data.color_palette.length > 0
-          ? [
-              `utilizar a seguinte paleta de cores como base do design: ${data.color_palette.join(", ")}`,
-            ]
-          : []),
-        data.visual_option.thematic_elements
-          ? `incluir elementos visuais temáticos alinhados ao nicho: ${data.visual_option.thematic_elements}`
-          : "incluir ícones ou elementos visuais que reforcem a identidade do nicho do produto",
-        ...(data.additional_instructions
-          ? [
-              `orientações adicionais do usuário: ${data.additional_instructions}`,
-            ]
-          : []),
-      ],
+  // instrucoes_extras — base + condicionais
+  const instrucoes_extras: string[] = [
+    "manter design clean, premium e informativo",
+    "garantir legibilidade em telas mobile",
+    "priorizar contraste forte entre elementos principais e fundo",
+    "usar as imagens de referência como elementos centrais da composição",
+    "não adicionar texto renderizado na imagem; apenas compor o visual",
+    "evitar poluição visual e manter acabamento profissional",
+    "criar background elaborado com elementos visuais que façam referência ao produto e nicho, evitar fundos de cor única ou gradientes puros — usar texturas, gradientes com inclusão de elementos, padrões ou elementos contextuais",
+    "incluir efeitos tecnológicos como linhas geométricas finas, gradientes sutis, elementos em transparência, overlays e formas abstratas que deem um visual moderno e tecnológico ao criativo",
+    "a headline deve ocupar de 30% a 40% da área da imagem, com tipografia grande e impactante; aplicar cor de destaque (contraste forte ou cor de acento da paleta) nas palavras ou trechos-chave da headline para criar hierarquia visual e aumentar o impacto",
+  ];
+
+  if (data.color_palette && data.color_palette.length > 0) {
+    const [primary, secondary, accent] = data.color_palette;
+    const parts = [
+      primary ? `primária: ${primary}` : null,
+      secondary ? `secundária: ${secondary}` : null,
+      accent ? `destaque: ${accent}` : null,
+    ].filter(Boolean);
+    instrucoes_extras.push(`utilizar a seguinte paleta de cores da marca: ${parts.join(", ")}`);
+  }
+
+  if (vo.thematic_elements) {
+    instrucoes_extras.push(`incluir elementos visuais temáticos alinhados ao nicho: ${vo.thematic_elements}`);
+  }
+
+  if (data.additional_instructions) {
+    instrucoes_extras.push(`orientações adicionais do usuário: ${data.additional_instructions}`);
+  }
+
+  const promptObj = {
+    tipo: "criativo_publicitario_estatico",
+    formato: data.format,
+    idioma_textos: "português do Brasil",
+    objetivo: "anuncio_meta_ads",
+    produto: {
+      nome: data.product_name,
+      promessa: data.promise || "",
     },
-    null,
-    2,
-  );
+    conceito_criativo: {
+      angulo: data.headline,
+      dor_principal: toLines(data.pains),
+      beneficios: toLines(data.benefits),
+      objecoes_trabalhadas: toLines(data.objections),
+    },
+    imagens_referencia,
+    layout: {
+      estilo: vo.layout_style,
+      composicao: vo.composition,
+      hierarquia_visual: vo.visual_hierarchy,
+      distribuicao_elementos: vo.element_distribution,
+      destaque_cta: vo.cta_highlight,
+    },
+    textos: {
+      headline: data.headline,
+      subheadline: data.body,
+      cta: data.cta,
+    },
+    direcao_visual: {
+      descricao: vo.visual_description,
+      atmosfera: "clean premium, conversão alta, estética realista de anúncio para Instagram/Facebook",
+    },
+    instrucoes_extras,
+  };
+
+  return JSON.stringify(promptObj, null, 2);
 }
 
-async function generateWithRetry(
+async function falRequest(
+  url: string,
   falKey: string,
-  prompt: string,
-  imageUrls: string[],
-  aspectRatio: string,
+  body: Record<string, unknown>,
   index: number,
   maxRetries = 3,
 ): Promise<{ url: string }> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const res = await fetch("https://fal.run/fal-ai/nano-banana-pro/edit", {
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Key ${falKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        prompt,
-        image_urls: imageUrls,
-        aspect_ratio: aspectRatio,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (res.status === 429) {
@@ -163,6 +168,96 @@ async function generateWithRetry(
     return { url: generatedUrl };
   }
   throw new Error("Max retries exceeded");
+}
+
+function generateGptImage2(falKey: string, prompt: string, imageUrls: string[], imageSize: string, index: number) {
+  return falRequest(
+    "https://fal.run/openai/gpt-image-2/edit",
+    falKey,
+    { prompt, image_urls: imageUrls, image_size: imageSize, quality: "medium", num_images: 1, output_format: "png" },
+    index,
+  );
+}
+
+function generateNanoBanana(falKey: string, modelSlug: string, prompt: string, imageUrls: string[], aspectRatio: string, index: number) {
+  const isNanoBanana2 = modelSlug === "nano-banana-2";
+  return falRequest(
+    `https://fal.run/fal-ai/${modelSlug}/edit`,
+    falKey,
+    {
+      prompt: JSON.stringify({ prompt }),
+      image_urls: imageUrls,
+      aspect_ratio: aspectRatio,
+      resolution: "1K",
+      num_images: 1,
+      output_format: "png",
+      ...(isNanoBanana2 ? { limit_generations: true } : {}),
+    },
+    index,
+  );
+}
+
+async function generateCaption(
+  openaiKey: string,
+  params: {
+    product_name: string;
+    headline: string;
+    body: string;
+    cta: string;
+    pains?: string;
+    benefits?: string;
+  },
+): Promise<string> {
+  const userContent = [
+    `Produto: ${params.product_name}`,
+    `Headline do anúncio: ${params.headline}`,
+    `Copy: ${params.body}`,
+    `CTA: ${params.cta}`,
+    params.pains ? `Dores do público: ${params.pains}` : null,
+    params.benefits ? `Benefícios: ${params.benefits}` : null,
+  ].filter(Boolean).join("\n");
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openaiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `Você é especialista em copywriting para redes sociais. Gere uma legenda completa para postagem no Instagram/Facebook em português do Brasil, seguindo EXATAMENTE esta estrutura e ordem (não inclua os títulos das seções no texto final):
+
+1. HEADLINE — frase de abertura impactante baseada na copy do anúncio
+(linha em branco)
+2. DOR — 1 a 2 frases identificando o problema/frustração do público
+(linha em branco)
+3. TRANSFORMAÇÃO — 1 a 2 frases mostrando a mudança concreta que o produto proporciona
+(linha em branco)
+4. BENEFÍCIOS — 3 a 4 benefícios principais, cada um em uma linha, com emoji relevante no início
+(linha em branco)
+5. CTA — use EXATAMENTE o texto de CTA fornecido; pode adicionar uma frase curta de urgência ou curiosidade antes ou depois, mas o texto original do CTA deve aparecer íntegro
+(linha em branco)
+6. HASHTAGS — 10 a 15 hashtags relevantes ao produto e nicho
+
+Retorne APENAS o texto formatado, sem títulos de seção, sem numeração.`,
+        },
+        { role: "user", content: userContent },
+      ],
+      max_tokens: 700,
+      temperature: 0.75,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`OpenAI caption error (${response.status}): ${err.substring(0, 200)}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
 async function updateRequestStatus(
@@ -201,6 +296,8 @@ serve(async (req) => {
   try {
     const falKey = Deno.env.get("FAL_KEY");
     if (!falKey) throw new Error("FAL_KEY not configured");
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiKey) throw new Error("OPENAI_API_KEY not configured");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -211,6 +308,7 @@ serve(async (req) => {
 
     const {
       image_urls,
+      logo_url,
       product_name,
       promise,
       pains,
@@ -223,7 +321,11 @@ serve(async (req) => {
       format,
       quantity,
       color_palette,
+      creative_style,
       additional_instructions,
+      image_instructions,
+      request_id,
+      model,
     } = await req.json();
 
     if (!image_urls?.length) throw new Error("At least one image is required");
@@ -239,30 +341,43 @@ serve(async (req) => {
     } catch { /* ignore */ }
 
     const numImages = Math.min(Math.max(1, quantity || 1), 4);
-    const aspectRatio = FORMAT_TO_RATIO[format] || "1:1";
+    const aspectRatio = FORMAT_TO_IMAGE_SIZE[format] || "square_hd";
 
-    const promptJson = buildPrompt({
+    // Product images first, brand logo last (prompt references it as "last reference image")
+    const allImageUrls: string[] = logo_url
+      ? [...image_urls, logo_url]
+      : image_urls;
+
+    const prompt = buildPrompt({
       product_name,
-      format,
       promise,
       pains,
       benefits,
       objections,
+      format,
       headline,
       body,
       cta,
       color_palette,
+      has_logo: !!logo_url,
       additional_instructions,
+      image_instructions,
       visual_option,
     });
 
-    const prompt = promptJson;
+    // Start caption generation in parallel with image generation
+    const captionPromise = generateCaption(openaiKey, { product_name, headline, body, cta, pains, benefits });
 
-    console.log("Generating", numImages, "images via fal.ai nano-banana-pro...");
+    console.log(`Generating ${numImages} image(s) via fal.ai model: ${model || "gpt-image-2"}, logo: ${!!logo_url}, colors: ${color_palette?.length ?? 0}`);
     const generatedImages: { url: string }[] = [];
     for (let i = 0; i < numImages; i++) {
       console.log(`Generating image ${i + 1}/${numImages}...`);
-      const img = await generateWithRetry(falKey, prompt, image_urls, aspectRatio, i);
+      let img: { url: string };
+      if (model === "nano-banana-pro" || model === "nano-banana-2") {
+        img = await generateNanoBanana(falKey, model, prompt, allImageUrls, format || "1:1", i);
+      } else {
+        img = await generateGptImage2(falKey, prompt, allImageUrls, aspectRatio, i);
+      }
       generatedImages.push(img);
     }
 
@@ -281,10 +396,7 @@ serve(async (req) => {
 
         const { error } = await supabaseAdmin.storage
           .from("generated-creatives")
-          .upload(fileName, bytes, {
-            contentType,
-            upsert: false,
-          });
+          .upload(fileName, bytes, { contentType, upsert: false });
 
         if (error) throw new Error(`Storage upload failed: ${error.message}`);
 
@@ -296,9 +408,18 @@ serve(async (req) => {
       })
     );
 
+    // Await caption (runs concurrently with image generation/upload)
+    let caption = "";
+    try {
+      caption = await captionPromise;
+      console.log("Caption generated successfully");
+    } catch (e) {
+      console.error("Caption generation failed (non-fatal):", e);
+    }
+
     console.log("Successfully generated and uploaded", uploadedUrls.length, "images");
 
-    return new Response(JSON.stringify({ images: uploadedUrls }), {
+    return new Response(JSON.stringify({ images: uploadedUrls, caption }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

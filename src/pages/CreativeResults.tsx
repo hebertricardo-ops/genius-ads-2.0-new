@@ -1,16 +1,20 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Download, Plus, ArrowLeft, CheckCircle2, Image, Loader2, RefreshCw, Copy, MessageSquare } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Download, Plus, ArrowLeft, CheckCircle2, Image, Loader2, RefreshCw, Copy, Check, MessageSquare, Smartphone } from "lucide-react";
+import { useSocialPublish } from "@/hooks/useSocialPublish";
+import SocialPublishModal from "@/components/SocialPublishModal";
 
 const CreativeResults = () => {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { toast } = useToast();
+  const { isConnected, profileLoading } = useSocialPublish();
+  const [copied, setCopied] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
 
   const { data: creatives = [], isLoading } = useQuery({
     queryKey: ["creative-results", requestId],
@@ -40,7 +44,17 @@ const CreativeResults = () => {
     enabled: !!requestId && !!user,
   });
 
-  const copyData = creatives[0]?.copy_data as Record<string, any> | null;
+  const caption: string = (creatives[0]?.copy_data as any)?.caption || "";
+
+  const handleCopyCaption = async () => {
+    try {
+      await navigator.clipboard.writeText(caption);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const handleRegenerate = () => {
     if (!requestData) return;
@@ -83,6 +97,13 @@ const CreativeResults = () => {
     }
   };
 
+  const gridClass =
+    creatives.length === 1
+      ? "grid-cols-1 max-w-2xl mx-auto"
+      : creatives.length === 2
+      ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto"
+      : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
+
   return (
     <div>
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -110,85 +131,28 @@ const CreativeResults = () => {
               </span>
             </div>
 
-            {/* Summary card */}
-            {copyData && (
-              <div className="gradient-card rounded-2xl p-6 border border-border shadow-card">
-                <h3 className="font-display text-foreground text-lg mb-4">Resumo da Geração</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                  {copyData.angle_name && (
-                    <div>
-                      <span className="text-muted-foreground block mb-1">Ângulo</span>
-                      <span className="text-foreground font-medium">{copyData.angle_name}</span>
-                    </div>
-                  )}
-                  {copyData.headline && (
-                    <div>
-                      <span className="text-muted-foreground block mb-1">Headline</span>
-                      <span className="text-foreground font-medium">{copyData.headline}</span>
-                    </div>
-                  )}
-                  {copyData.format && (
-                    <div>
-                      <span className="text-muted-foreground block mb-1">Formato</span>
-                      <span className="text-foreground font-medium">{copyData.format}</span>
-                    </div>
-                  )}
-                  {copyData.cta && (
-                    <div>
-                      <span className="text-muted-foreground block mb-1">CTA</span>
-                      <span className="inline-block px-3 py-1 rounded-lg gradient-primary text-primary-foreground text-xs font-semibold">
-                        {copyData.cta}
-                      </span>
-                    </div>
-                  )}
-                  {copyData.visual_option && (
-                    <div>
-                      <span className="text-muted-foreground block mb-1">Opção Visual</span>
-                      <span className="text-foreground font-medium">{copyData.visual_option}</span>
-                    </div>
-                  )}
-                  {copyData.body && (
-                    <div className="md:col-span-2 lg:col-span-3">
-                      <span className="text-muted-foreground block mb-1">Body</span>
-                      <span className="text-foreground/80 text-xs">{copyData.body}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="mt-5 flex justify-center">
-                  <Button variant="outline" size="sm" onClick={handleRegenerate} disabled={!requestData} className="w-full sm:w-auto">
-                    <RefreshCw className="w-4 h-4" /> Gerar novo com mesmos dados
-                  </Button>
-                </div>
-              </div>
-            )}
-
             {/* Gallery */}
             <div>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-display text-foreground">Criativos Gerados</h2>
-                {creatives.length > 1 && (
+              {creatives.length > 1 && (
+                <div className="flex justify-end mb-6">
                   <Button variant="outline" size="sm" onClick={handleDownloadAll}>
                     <Download className="w-4 h-4" /> Baixar Todos
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
 
-              <div className={`grid gap-6 ${
-                creatives.length === 1 ? "grid-cols-1 max-w-lg mx-auto" :
-                creatives.length === 2 ? "grid-cols-1 md:grid-cols-2" :
-                "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-              }`}>
+              <div className={`grid gap-6 ${gridClass}`}>
                 {creatives.map((creative, idx) => (
                   <div
                     key={creative.id}
                     className="gradient-card rounded-2xl border border-border shadow-card overflow-hidden group animate-fade-in"
                     style={{ animationDelay: `${idx * 100}ms` }}
                   >
-                    <div className="relative aspect-square overflow-hidden bg-secondary/30">
+                    <div className="relative overflow-hidden bg-secondary/30">
                       <img
                         src={creative.image_url}
                         alt={`Criativo ${idx + 1}`}
-                        className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+                        className="w-full h-auto object-contain transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"
                       />
                     </div>
@@ -210,45 +174,72 @@ const CreativeResults = () => {
               </div>
             </div>
 
-            {/* Ad Captions */}
-            {copyData?.ad_captions && (copyData.ad_captions as any[]).length > 0 && (
-              <div className="gradient-card rounded-2xl p-6 border border-border shadow-card">
-                <div className="flex items-center gap-2 mb-4">
-                  <MessageSquare className="w-5 h-5 text-primary" />
-                  <h3 className="font-display text-foreground text-lg">Legendas para o Anúncio</h3>
+            {/* Caption */}
+            {caption && (
+              <div className="gradient-card rounded-2xl border border-border shadow-card p-6 space-y-4 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-primary" />
+                    <h3 className="text-base font-display text-foreground">Legenda para postagem</h3>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopyCaption}
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {copied ? (
+                      <><Check className="w-4 h-4 text-green-500" /> Copiado!</>
+                    ) : (
+                      <><Copy className="w-4 h-4" /> Copiar</>
+                    )}
+                  </Button>
                 </div>
-                <div className="space-y-4">
-                  {(copyData.ad_captions as any[]).map((item: any, idx: number) => (
-                    <div key={idx} className="p-4 rounded-xl bg-background/50 border border-border space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-primary uppercase tracking-wider">Opção {idx + 1}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            navigator.clipboard.writeText(item.caption);
-                            toast({ title: "Legenda copiada!", description: `Opção ${idx + 1} copiada para a área de transferência.` });
-                          }}
-                        >
-                          <Copy className="w-3 h-3 mr-1" /> Copiar
-                        </Button>
-                      </div>
-                      <p className="text-sm text-foreground whitespace-pre-line">{item.caption}</p>
-                    </div>
-                  ))}
-                </div>
+                <pre className="text-sm text-foreground/80 whitespace-pre-wrap font-sans leading-relaxed">
+                  {caption}
+                </pre>
               </div>
             )}
 
             {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+              <Button variant="outline" onClick={handleRegenerate} disabled={!requestData}>
+                <RefreshCw className="w-4 h-4" /> Gerar novo com mesmos dados
+              </Button>
               <Button variant="outline" onClick={() => navigate("/dashboard")}>
                 <ArrowLeft className="w-4 h-4" /> Voltar ao Dashboard
               </Button>
+              {profileLoading ? (
+                <Button variant="outline" disabled>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Publicar nas Redes Sociais
+                </Button>
+              ) : isConnected ? (
+                <Button variant="outline" onClick={() => setShowPublishModal(true)}>
+                  <Smartphone className="w-4 h-4" /> Publicar nas Redes Sociais
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  title="Conecte suas redes sociais primeiro"
+                  onClick={() => navigate("/social-accounts")}
+                  className="opacity-60 hover:opacity-100 transition-opacity"
+                >
+                  <Smartphone className="w-4 h-4" /> Publicar nas Redes Sociais
+                </Button>
+              )}
               <Button variant="hero" onClick={() => navigate("/create")}>
                 <Plus className="w-4 h-4" /> Novo Criativo
               </Button>
             </div>
+
+            <SocialPublishModal
+              open={showPublishModal}
+              onClose={() => setShowPublishModal(false)}
+              imageUrl={creatives[0]?.image_url ?? ""}
+              creativeId={creatives[0]?.id}
+              defaultCaption={caption}
+              brandId={(creatives[0] as any)?.brand_id ?? undefined}
+            />
           </div>
         )}
       </div>

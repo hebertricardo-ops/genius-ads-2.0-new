@@ -14,6 +14,96 @@ export type Database = {
   }
   public: {
     Tables: {
+      content_calendar: {
+        Row: {
+          id: string
+          user_id: string
+          brand_id: string | null
+          title: string
+          description: string | null
+          scheduled_date: string
+          status: string
+          platform: string | null
+          content_type: string | null
+          creative_id: string | null
+          carousel_request_id: string | null
+          upload_post_request_id: string | null
+          image_url: string | null
+          caption: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          brand_id?: string | null
+          title: string
+          description?: string | null
+          scheduled_date: string
+          status?: string
+          platform?: string | null
+          content_type?: string | null
+          creative_id?: string | null
+          carousel_request_id?: string | null
+          upload_post_request_id?: string | null
+          image_url?: string | null
+          caption?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          brand_id?: string | null
+          title?: string
+          description?: string | null
+          scheduled_date?: string
+          status?: string
+          platform?: string | null
+          content_type?: string | null
+          creative_id?: string | null
+          carousel_request_id?: string | null
+          upload_post_request_id?: string | null
+          image_url?: string | null
+          caption?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      social_profiles: {
+        Row: {
+          id: string
+          user_id: string
+          upload_post_username: string
+          connected_platforms: string[]
+          is_connected: boolean
+          last_connected_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          upload_post_username: string
+          connected_platforms?: string[]
+          is_connected?: boolean
+          last_connected_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          upload_post_username?: string
+          connected_platforms?: string[]
+          is_connected?: boolean
+          last_connected_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       carousel_requests: {
         Row: {
           benefits: string
@@ -337,7 +427,10 @@ export type Database = {
           created_at: string
           credits_balance: number
           credits_used: number
+          extra_credits: number
           id: string
+          last_reset_at: string | null
+          subscription_credits: number
           updated_at: string
           user_id: string
         }
@@ -345,7 +438,10 @@ export type Database = {
           created_at?: string
           credits_balance?: number
           credits_used?: number
+          extra_credits?: number
           id?: string
+          last_reset_at?: string | null
+          subscription_credits?: number
           updated_at?: string
           user_id: string
         }
@@ -353,11 +449,110 @@ export type Database = {
           created_at?: string
           credits_balance?: number
           credits_used?: number
+          extra_credits?: number
           id?: string
+          last_reset_at?: string | null
+          subscription_credits?: number
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      plans: {
+        Row: {
+          created_at: string
+          credits_per_item: number
+          id: string
+          is_active: boolean
+          max_brands: number | null
+          monthly_credits: number
+          name: string
+          price_annual: number
+          price_monthly: number
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          credits_per_item?: number
+          id?: string
+          is_active?: boolean
+          max_brands?: number | null
+          monthly_credits: number
+          name: string
+          price_annual: number
+          price_monthly: number
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          credits_per_item?: number
+          id?: string
+          is_active?: boolean
+          max_brands?: number | null
+          monthly_credits?: number
+          name?: string
+          price_annual?: number
+          price_monthly?: number
+          slug?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          billing_cycle: string
+          cancelled_at: string | null
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          hotmart_subscription_id: string | null
+          id: string
+          plan_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          billing_cycle?: string
+          cancelled_at?: string | null
+          created_at?: string
+          current_period_end: string
+          current_period_start?: string
+          hotmart_subscription_id?: string | null
+          id?: string
+          plan_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          billing_cycle?: string
+          cancelled_at?: string | null
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          hotmart_subscription_id?: string | null
+          id?: string
+          plan_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {

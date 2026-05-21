@@ -22,12 +22,25 @@ import ChangePassword from "./pages/ChangePassword";
 import AddCredits from "./pages/AddCredits";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import EmailConfirmation from "./pages/EmailConfirmation";
+import AuthCallback from "./pages/AuthCallback";
+import BrandSetup from "./pages/BrandSetup";
+import BrandsManager from "./pages/BrandsManager";
+import Subscription from "./pages/Subscription";
+import SignUp from "./pages/SignUp";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfUse from "./pages/TermsOfUse";
+import Calendario from "./pages/Calendario";
+import SocialAccounts from "./pages/SocialAccounts";
+import { BrandProvider } from "@/contexts/BrandContext";
 
 const queryClient = new QueryClient();
 
 const ProtectedWithLayout = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>
-    <AppLayout>{children}</AppLayout>
+    <BrandProvider>
+      <AppLayout>{children}</AppLayout>
+    </BrandProvider>
   </ProtectedRoute>
 );
 
@@ -42,6 +55,11 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-use" element={<TermsOfUse />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/email-confirmation" element={<EmailConfirmation />} />
             <Route path="/dashboard" element={<ProtectedWithLayout><Dashboard /></ProtectedWithLayout>} />
             <Route path="/create" element={<ProtectedWithLayout><CreateCreative /></ProtectedWithLayout>} />
             <Route path="/create-carousel" element={<ProtectedWithLayout><CreateCarousel /></ProtectedWithLayout>} />
@@ -54,6 +72,12 @@ const App = () => (
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
+            <Route path="/brands" element={<ProtectedWithLayout><BrandsManager /></ProtectedWithLayout>} />
+            <Route path="/brands/new" element={<ProtectedWithLayout><BrandSetup /></ProtectedWithLayout>} />
+            <Route path="/brands/:id/edit" element={<ProtectedWithLayout><BrandSetup /></ProtectedWithLayout>} />
+            <Route path="/subscription" element={<ProtectedWithLayout><Subscription /></ProtectedWithLayout>} />
+            <Route path="/calendario" element={<ProtectedWithLayout><Calendario /></ProtectedWithLayout>} />
+            <Route path="/social-accounts" element={<ProtectedWithLayout><SocialAccounts /></ProtectedWithLayout>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
