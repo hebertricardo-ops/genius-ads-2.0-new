@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { ensureSupportedFormat } from "../_shared/image-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -328,11 +329,11 @@ serve(async (req) => {
       model,
     } = await req.json();
 
-    if (!image_urls?.length) throw new Error("At least one image is required");
+    if (!image_urls?.length && !logo_url) throw new Error("At least one image or a logo is required");
     if (!product_name || !headline || !cta || !visual_option)
       throw new Error("Missing required fields");
 
-    // Extract user_id from JWT for status updates
+    // Extract user_id from JWT
     let userId: string | null = null;
     try {
       const token = authHeader.replace("Bearer ", "");
@@ -340,13 +341,39 @@ serve(async (req) => {
       userId = user?.id || null;
     } catch { /* ignore */ }
 
+    const CREDITS_PER_IMAGE = 10;
     const numImages = Math.min(Math.max(1, quantity || 1), 4);
+    const totalCost = CREDITS_PER_IMAGE * numImages;
     const aspectRatio = FORMAT_TO_IMAGE_SIZE[format] || "square_hd";
 
-    // Product images first, brand logo last (prompt references it as "last reference image")
-    const allImageUrls: string[] = logo_url
-      ? [...image_urls, logo_url]
+    // Verificar saldo ANTES de chamar o fal.ai
+    if (userId) {
+      const { data: creditData } = await supabaseAdmin
+        .from("user_credits")
+        .select("credits_balance")
+        .eq("user_id", userId)
+        .single();
+
+      if (!creditData || creditData.credits_balance < totalCost) {
+        return new Response(
+          JSON.stringify({ error: "Créditos insuficientes" }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Converter SVGs para PNG antes de enviar ao fal.ai
+    const safeImageUrls = userId
+      ? await Promise.all(image_urls.map((url: string) => ensureSupportedFormat(url, supabaseAdmin, userId)))
       : image_urls;
+    const safeLogoUrl = logo_url && userId
+      ? await ensureSupportedFormat(logo_url, supabaseAdmin, userId)
+      : logo_url;
+
+    // Product images first, brand logo last (prompt references it as "last reference image")
+    const allImageUrls: string[] = safeLogoUrl
+      ? [...safeImageUrls, safeLogoUrl]
+      : safeImageUrls;
 
     const prompt = buildPrompt({
       product_name,
@@ -359,7 +386,7 @@ serve(async (req) => {
       body,
       cta,
       color_palette,
-      has_logo: !!logo_url,
+      has_logo: !!safeLogoUrl,
       additional_instructions,
       image_instructions,
       visual_option,
@@ -415,6 +442,26 @@ serve(async (req) => {
       console.log("Caption generated successfully");
     } catch (e) {
       console.error("Caption generation failed (non-fatal):", e);
+    }
+
+    // Deduzir créditos APÓS sucesso (operação atômica — sem race condition)
+    if (userId && uploadedUrls.length > 0) {
+      const amountToDeduct = CREDITS_PER_IMAGE * uploadedUrls.length;
+      const { data: deductResult } = await supabaseAdmin.rpc("deduct_credits", {
+        p_user_id: userId,
+        p_amount: amountToDeduct,
+      });
+      if (!deductResult?.success) {
+        console.error("Falha ao deduzir créditos:", deductResult?.error);
+      } else {
+        await supabaseAdmin.from("credit_transactions").insert({
+          user_id: userId,
+          type: "usage",
+          amount: -amountToDeduct,
+          description: `Criativo gerado: ${product_name} (${uploadedUrls.length} imagem${uploadedUrls.length > 1 ? "ns" : ""})`,
+        });
+        console.log(`Deducted ${amountToDeduct} credits from user ${userId}`);
+      }
     }
 
     console.log("Successfully generated and uploaded", uploadedUrls.length, "images");

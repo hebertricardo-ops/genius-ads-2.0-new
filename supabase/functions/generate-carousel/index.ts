@@ -1,5 +1,6 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { ensureSupportedFormat } from "../_shared/image-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -296,7 +297,10 @@ DIRETRIZES DE COPY:
 - O CTA final deve ser compatível com o contexto da oferta.
 - O texto precisa caber bem em layout de slide.
 - Evite frases longas demais.
-- Sempre pense em performance para Meta Ads e redes sociais.`;
+- Sempre pense em performance para Meta Ads e redes sociais.
+
+REGRA DE CTA — INSTRUÇÃO CRÍTICA:
+O CTA base fornecido pelo usuário é INTOCÁVEL e deve aparecer LITERALMENTE no CTA do slide final. PROIBIDO substituir, parafrasear ou omitir qualquer palavra do CTA base. Formato obrigatório: [CTA BASE EXATO] + [complemento opcional com gatilho de urgência ou curiosidade]. EXEMPLO CORRETO (CTA base: "Clique em Saiba Mais"): ✅ "Clique em Saiba Mais e transforme sua criação de anúncios hoje" ✅ "Clique em Saiba Mais — seu próximo criativo leva 60 segundos" ✅ "Clique em Saiba Mais agora". EXEMPLO ERRADO — TERMINANTEMENTE PROIBIDO: ❌ "Clique e mude sua forma de fazer anúncios agora" ❌ "Descubra como criar anúncios em 60 segundos" ❌ Qualquer CTA que não comece com as palavras exatas do CTA base.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -353,11 +357,13 @@ Tom/estilo desejado: ${creative_style || "Não especificado"}
 CTA base informado pelo usuário: ${cta || "A IA deve criar um CTA adequado"}
 Informações adicionais: ${extra_context || "Nenhuma"}
 
-REGRA DE CTA: Use o CTA informado pelo usuário como ponto de partida e reescreva-o para o slide final incluindo uma frase complementar que desperte gatilho de urgência ou gatilho de desejo. Ex: se o CTA base for "Saiba Mais", o CTA final pode ser "Saiba Mais Antes que Acabe" ou "Descubra o Segredo — Saiba Mais". Se o CTA base for "Compre Agora", pode virar "Compre Agora e Garanta o Seu" ou "Compre Agora — Oferta por Tempo Limitado". Mantenha o CTA curto, direto e com no máximo 8 palavras.
+REGRA DE CTA — INSTRUÇÃO CRÍTICA: O CTA base fornecido pelo usuário é INTOCÁVEL e deve aparecer LITERALMENTE no CTA do slide final. PROIBIDO substituir, parafrasear ou omitir qualquer palavra do CTA base. Formato obrigatório: [CTA BASE EXATO] + [complemento opcional com gatilho de urgência ou curiosidade]. EXEMPLO CORRETO (CTA base: "Clique em Saiba Mais"): ✅ "Clique em Saiba Mais e transforme sua criação de anúncios hoje" ✅ "Clique em Saiba Mais — seu próximo criativo leva 60 segundos" ✅ "Clique em Saiba Mais agora". EXEMPLO ERRADO — TERMINANTEMENTE PROIBIDO: ❌ "Clique e mude sua forma de fazer anúncios agora" ❌ "Descubra como criar anúncios em 60 segundos" ❌ Qualquer CTA que não comece com as palavras exatas do CTA base.
 
 REGRA DE LEGENDAS: Além da copy dos slides, gere também 3 opções de legenda para a postagem do carrossel. Cada legenda deve seguir a estrutura: 1) Gancho forte (primeira linha que prende atenção), 2) Desenvolvimento persuasivo (2-3 frases curtas), 3) CTA final. As legendas devem ser variadas em tom e abordagem, baseadas nas informações do produto. Máximo de 280 caracteres por legenda.
 
-Agora gere a copy completa do carrossel.`;
+Agora gere a copy completa do carrossel.
+
+LEMBRETE CRÍTICO — INSTRUÇÃO INVIOLÁVEL: O CTA do slide final DEVE começar obrigatoriamente com as palavras exatas: ${cta || "Compre agora"}. É PROIBIDO usar qualquer outro CTA que não inicie com essa frase. Complementos são permitidos após as palavras do CTA base, mas as palavras originais devem estar presentes e inalteradas.`;
 
   const slideSchema = {
     type: "object" as const,
@@ -379,7 +385,7 @@ Agora gere a copy completa do carrossel.`;
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: "gpt-4.1-mini",
       messages: [
         { role: "system", content: CAROUSEL_SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
@@ -459,9 +465,10 @@ async function handleImagesPhase(body: any, authHeader: string) {
   const { image_urls, copy, product_name, creative_style, slides_count } = body;
   if (!copy?.slides?.length) throw new Error("Missing approved copy data");
 
+  const CREDITS_PER_SLIDE = 10;
   const numSlides = copy.slides.length;
   const typographyStyle = body.typography_style || "sans-serif geométrica (Montserrat ou similar)";
-  const creditsCost: number = copy.credits_cost || numSlides;
+  const creditsCost = numSlides * CREDITS_PER_SLIDE;
 
   // Extract userId from JWT
   let userId: string | null = null;
@@ -471,7 +478,7 @@ async function handleImagesPhase(body: any, authHeader: string) {
     userId = user?.id || null;
   } catch { /* ignore */ }
 
-  // Check credits before generating
+  // Verificar saldo ANTES de gerar
   if (userId) {
     const { data: creditData } = await supabaseAdmin
       .from("user_credits")
@@ -487,10 +494,15 @@ async function handleImagesPhase(body: any, authHeader: string) {
     }
   }
 
+  // Converter SVGs para PNG antes de enviar ao fal.ai
+  const safeImageUrls = userId && image_urls?.length
+    ? await Promise.all((image_urls as string[]).map((url) => ensureSupportedFormat(url, supabaseAdmin, userId)))
+    : (image_urls || []);
+
   console.log(`Phase 2 (images): Generating ${numSlides} slide images via ${IMAGE_PROVIDER}...`);
 
   if (IMAGE_PROVIDER === "fal") {
-    return await handleImagesWithFal(copy, image_urls || [], product_name, creative_style, numSlides, typographyStyle, supabaseAdmin, userId, creditsCost);
+    return await handleImagesWithFal(copy, safeImageUrls, product_name, creative_style, numSlides, typographyStyle, supabaseAdmin, userId, creditsCost);
   } else {
     return await handleImagesWithVertex(body, copy, image_urls, product_name, creative_style, numSlides, supabaseAdmin);
   }
@@ -579,21 +591,25 @@ async function handleImagesWithFal(
     );
   }
 
-  // Deduct credits once after all slides generated
+  // Deduzir somente pelos slides gerados com sucesso (operação atômica)
   if (userId && generatedSlides.length > 0) {
+    const CREDITS_PER_SLIDE = 10;
+    const amountToDeduct = generatedSlides.length * CREDITS_PER_SLIDE;
     try {
-      const { data: creditData } = await supabaseAdmin
-        .from("user_credits")
-        .select("credits_balance")
-        .eq("user_id", userId)
-        .single();
-
-      if (creditData) {
-        await supabaseAdmin
-          .from("user_credits")
-          .update({ credits_balance: creditData.credits_balance - creditsCost })
-          .eq("user_id", userId);
-        console.log(`Deducted ${creditsCost} credits from user ${userId}`);
+      const { data: deductResult } = await supabaseAdmin.rpc("deduct_credits", {
+        p_user_id: userId,
+        p_amount: amountToDeduct,
+      });
+      if (!deductResult?.success) {
+        console.error("Falha ao deduzir créditos:", deductResult?.error);
+      } else {
+        await supabaseAdmin.from("credit_transactions").insert({
+          user_id: userId,
+          type: "usage",
+          amount: -amountToDeduct,
+          description: `Carrossel gerado: ${generatedSlides.length} slide${generatedSlides.length > 1 ? "s" : ""}`,
+        });
+        console.log(`Deducted ${amountToDeduct} credits from user ${userId}`);
       }
     } catch (e) {
       console.error("Failed to deduct credits:", e);
@@ -838,14 +854,22 @@ async function handleSingleImageWithFal(
   supabaseAdmin: any,
   userId: string | null,
 ) {
+  // Converter SVGs para PNG antes de enviar ao fal.ai
+  const safeImageUrls = userId && imageUrls?.length
+    ? await Promise.all(imageUrls.map((url) => ensureSupportedFormat(url, supabaseAdmin, userId)))
+    : (imageUrls || []);
+  const safeLogoUrl = logoUrl && userId
+    ? await ensureSupportedFormat(logoUrl, supabaseAdmin, userId).catch(() => logoUrl)
+    : logoUrl;
+
   // Build reference image list: product images first, existing slides for style ref, logo last
-  const allRefUrls = [...(imageUrls || [])];
+  const allRefUrls = [...safeImageUrls];
   if (existingSlideUrls?.length) {
     allRefUrls.push(...existingSlideUrls.slice(0, 2));
   }
-  const hasLogoReference = !!logoUrl;
-  if (logoUrl) {
-    allRefUrls.push(logoUrl); // logo always last — prompt references it as "última imagem"
+  const hasLogoReference = !!safeLogoUrl;
+  if (safeLogoUrl) {
+    allRefUrls.push(safeLogoUrl); // logo always last — prompt references it as "última imagem"
   }
 
   let lastError = "";

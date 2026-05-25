@@ -32,6 +32,14 @@ import { cn } from "@/lib/utils";
 
 const WEEK_DAYS = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
+const STATUS_BORDER_COLOR: Record<string, string> = {
+  idea:      "#9ca3af",
+  draft:     "#8b5cf6",
+  ready:     "#3b82f6",
+  scheduled: "#f59e0b",
+  published: "#22c55e",
+};
+
 const STATUS_CONFIG = {
   idea:      { label: "Ideia",      dot: "bg-muted-foreground", badge: "bg-muted/60 text-muted-foreground",       bar: "bg-muted-foreground/50" },
   draft:     { label: "Em criação", dot: "bg-purple-500",        badge: "bg-purple-500/10 text-purple-400",         bar: "bg-purple-500" },
@@ -69,6 +77,58 @@ const emptyForm = {
   carousel_request_id: null as string | null,
   image_url: "",
   caption: "",
+};
+
+const PlatformIcon = ({ platform }: { platform: string }) => {
+  if (platform === "instagram") return <Instagram className="w-2.5 h-2.5 text-muted-foreground/70" />;
+  if (platform === "facebook") return <Facebook className="w-2.5 h-2.5 text-muted-foreground/70" />;
+  if (platform === "both") return <><Instagram className="w-2.5 h-2.5 text-muted-foreground/70" /><Facebook className="w-2.5 h-2.5 text-muted-foreground/70" /></>;
+  if (platform === "tiktok") return <span className="text-[10px]">🎵</span>;
+  return <span className="text-[10px]">📱</span>;
+};
+
+const StatusBadge = ({ status }: { status: string }) => {
+  const cfg = STATUS_CONFIG[status as Status] ?? STATUS_CONFIG.idea;
+  return (
+    <span className={cn("inline-flex items-center gap-0.5 text-[9px] font-medium px-1 py-0.5 rounded-full", cfg.badge)}>
+      <span className={cn("w-1 h-1 rounded-full", cfg.dot)} />
+      {cfg.label}
+    </span>
+  );
+};
+
+const EventCard = ({ post, onClick }: { post: any; onClick: () => void }) => {
+  const statusColor = STATUS_BORDER_COLOR[post.status] ?? "#9ca3af";
+  return (
+    <div
+      className="flex items-center gap-1.5 rounded-lg border-l-2 bg-background shadow-sm p-1.5 mb-1 cursor-pointer hover:shadow-md transition-shadow"
+      style={{ borderLeftColor: statusColor }}
+      onClick={onClick}
+    >
+      {post.image_url ? (
+        <img src={post.image_url} className="w-8 h-8 rounded object-cover flex-shrink-0" alt="" />
+      ) : (
+        <div
+          className="w-8 h-8 rounded flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
+          style={{ backgroundColor: statusColor }}
+        >
+          {post.title?.charAt(0).toUpperCase() ?? "?"}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          {post.scheduled_time && (
+            <span className="text-[10px] text-muted-foreground font-medium">
+              {post.scheduled_time.slice(0, 5)}
+            </span>
+          )}
+          {post.platform && <PlatformIcon platform={post.platform} />}
+        </div>
+        <p className="text-[11px] font-medium truncate leading-tight">{post.title}</p>
+        <StatusBadge status={post.status} />
+      </div>
+    </div>
+  );
 };
 
 const Calendario = () => {
@@ -645,22 +705,18 @@ const Calendario = () => {
                         </button>
                       </div>
 
-                      <div className="space-y-0.5">
+                      <div>
                         {visible.map((post: any) => (
-                          <button
+                          <EventCard
                             key={post.id}
-                            onClick={(e) => { e.stopPropagation(); setDetailPost(post); }}
-                            className={cn(
-                              "w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate flex items-center gap-1 transition-opacity hover:opacity-80",
-                              STATUS_CONFIG[post.status as Status]?.badge ?? "bg-muted/60 text-muted-foreground",
-                            )}
-                          >
-                            <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_CONFIG[post.status as Status]?.dot)} />
-                            <span className="truncate">{post.title}</span>
-                          </button>
+                            post={post}
+                            onClick={(e: any) => { e?.stopPropagation?.(); setDetailPost(post); }}
+                          />
                         ))}
                         {overflow > 0 && (
-                          <p className="text-[10px] text-muted-foreground pl-1">+{overflow} mais</p>
+                          <span className="text-[10px] text-muted-foreground cursor-pointer hover:text-primary px-1">
+                            +{overflow} mais
+                          </span>
                         )}
                       </div>
                     </div>
@@ -733,37 +789,19 @@ const Calendario = () => {
                         </button>
                       </div>
 
-                      <div className="space-y-1.5">
-                        {dayPosts.map((post: any) => (
-                          <button
+                      <div>
+                        {dayPosts.slice(0, 3).map((post: any) => (
+                          <EventCard
                             key={post.id}
-                            onClick={(e) => { e.stopPropagation(); setDetailPost(post); }}
-                            className={cn(
-                              "w-full text-left px-2 py-1.5 rounded-lg transition-opacity hover:opacity-80",
-                              STATUS_CONFIG[post.status as Status]?.badge ?? "bg-muted/60 text-muted-foreground",
-                            )}
-                          >
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_CONFIG[post.status as Status]?.dot)} />
-                              <span className="text-[10px] font-medium truncate">{post.title}</span>
-                            </div>
-                            {(post.scheduled_time || post.platform) && (
-                              <div className="flex items-center gap-1 pl-3">
-                                {post.scheduled_time && (
-                                  <span className="text-[9px] text-muted-foreground/80">{post.scheduled_time.slice(0, 5)}</span>
-                                )}
-                                {post.platform === "instagram" && <Instagram className="w-2.5 h-2.5 text-muted-foreground/70" />}
-                                {post.platform === "facebook" && <Facebook className="w-2.5 h-2.5 text-muted-foreground/70" />}
-                                {post.platform === "both" && (
-                                  <>
-                                    <Instagram className="w-2.5 h-2.5 text-muted-foreground/70" />
-                                    <Facebook className="w-2.5 h-2.5 text-muted-foreground/70" />
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </button>
+                            post={post}
+                            onClick={(e: any) => { e?.stopPropagation?.(); setDetailPost(post); }}
+                          />
                         ))}
+                        {dayPosts.length > 3 && (
+                          <span className="text-[10px] text-muted-foreground cursor-pointer hover:text-primary px-1">
+                            +{dayPosts.length - 3} mais
+                          </span>
+                        )}
                         {dayPosts.length === 0 && (
                           <p className="text-[10px] text-muted-foreground/30 text-center pt-4">—</p>
                         )}
@@ -866,11 +904,33 @@ const Calendario = () => {
                       onChange={(e) => setForm((f) => ({ ...f, scheduled_date: e.target.value }))}
                     />
                   </div>
-                  <div className="w-28">
-                    <Input
-                      type="time"
-                      value={form.scheduled_time}
-                      onChange={(e) => setForm((f) => ({ ...f, scheduled_time: e.target.value }))}
+                  <div className="flex items-center gap-1 w-28">
+                    <input
+                      type="number"
+                      min={0}
+                      max={23}
+                      placeholder="HH"
+                      value={form.scheduled_time ? form.scheduled_time.split(":")[0] : ""}
+                      onChange={(e) => {
+                        const h = Math.min(23, Math.max(0, Number(e.target.value))).toString().padStart(2, "0");
+                        const m = form.scheduled_time ? form.scheduled_time.split(":")[1] ?? "00" : "00";
+                        setForm((f) => ({ ...f, scheduled_time: `${h}:${m}` }));
+                      }}
+                      className="w-12 text-center rounded-md border border-input bg-background px-1 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <span className="text-muted-foreground font-medium">:</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={59}
+                      placeholder="MM"
+                      value={form.scheduled_time ? form.scheduled_time.split(":")[1] ?? "" : ""}
+                      onChange={(e) => {
+                        const h = form.scheduled_time ? form.scheduled_time.split(":")[0] ?? "00" : "00";
+                        const m = Math.min(59, Math.max(0, Number(e.target.value))).toString().padStart(2, "0");
+                        setForm((f) => ({ ...f, scheduled_time: `${h}:${m}` }));
+                      }}
+                      className="w-12 text-center rounded-md border border-input bg-background px-1 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     />
                   </div>
                 </div>

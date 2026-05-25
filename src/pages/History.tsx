@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import {
   Image, Download, Clock, Loader2, RefreshCw, Layers,
   Copy, Trash2, ChevronLeft, ChevronRight, Check,
-  MessageSquare, LayoutGrid, Sparkles, Smile, MoreHorizontal, Send,
+  MessageSquare, LayoutGrid, Sparkles, Smile, MoreHorizontal, Send, Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -698,10 +698,20 @@ const History = () => {
                   className="w-full aspect-square object-cover"
                   loading="lazy"
                 />
+                {(creative.copy_data as any)?.is_edit && (
+                  <div className="absolute top-1.5 left-1.5">
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-primary/90 text-primary-foreground text-[10px] font-medium">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      Edição IA
+                    </span>
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="absolute bottom-0 left-0 right-0 px-2.5 py-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <span className="text-xs text-foreground font-medium truncate block">
-                    {info?.name || "Criativo"}
+                    {(creative.copy_data as any)?.is_edit
+                      ? ((creative.copy_data as any)?.edit_label ?? "Edição IA")
+                      : (info?.name || "Criativo")}
                   </span>
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
                     <Clock className="w-2.5 h-2.5" />
@@ -892,6 +902,18 @@ const History = () => {
                     >
                       <Send className="w-3 h-3" /> Postar
                     </Button>
+                    {info?.type === "creative" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs px-2.5 h-8"
+                        onClick={() => navigate(`/editor/${selectedCreative.id}`, {
+                          state: { imageUrl: selectedCreative.image_url, brandId: selectedCreative.brand_id },
+                        })}
+                      >
+                        <Pencil className="w-3 h-3" /> Editar IA
+                      </Button>
+                    )}
                     {info?.type === "creative" && (
                       <Button
                         size="sm"

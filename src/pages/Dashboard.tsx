@@ -319,15 +319,15 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* ── Histórico recente ── */}
-        <div className="gradient-card rounded-2xl border border-border shadow-card overflow-hidden">
-          <div className="p-6 border-b border-border flex items-center justify-between">
+        {/* ── Últimas Criações ── */}
+        <div className="bg-secondary/60 rounded-2xl overflow-hidden">
+          <div className="p-6 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-display text-foreground">Histórico recente</h2>
+              <h2 className="text-lg font-display text-foreground">Últimas Criações</h2>
               <p className="text-sm text-muted-foreground">Seus últimos criativos gerados</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => navigate("/history")} className="text-xs gap-1.5">
-              Ver tudo
+            <Button variant="ghost" size="sm" onClick={() => navigate("/history")} className="text-xs gap-1.5 border-0">
+              Ver Biblioteca
               <ArrowRight className="w-3.5 h-3.5" />
             </Button>
           </div>

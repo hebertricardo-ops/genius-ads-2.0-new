@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Download, Plus, ArrowLeft, CheckCircle2, Image, Loader2, RefreshCw, Copy, Check, MessageSquare, Smartphone } from "lucide-react";
+import { Download, Plus, ArrowLeft, CheckCircle2, Image, Loader2, RefreshCw, Copy, Check, MessageSquare, Smartphone, Pencil } from "lucide-react";
 import { useSocialPublish } from "@/hooks/useSocialPublish";
 import SocialPublishModal from "@/components/SocialPublishModal";
 
@@ -156,18 +156,30 @@ const CreativeResults = () => {
                         loading="lazy"
                       />
                     </div>
-                    <div className="p-4 flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground font-medium">
+                    <div className="p-4 flex items-center justify-between gap-2">
+                      <span className="text-sm text-muted-foreground font-medium shrink-0">
                         Criativo {idx + 1}
                       </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDownload(creative.image_url, idx)}
-                        className="text-primary hover:text-primary"
-                      >
-                        <Download className="w-4 h-4" /> Baixar
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate(`/editor/${creative.id}`, {
+                            state: { imageUrl: creative.image_url, brandId: (creative as any).brand_id ?? null },
+                          })}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          <Pencil className="w-4 h-4" /> Editar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDownload(creative.image_url, idx)}
+                          className="text-primary hover:text-primary"
+                        >
+                          <Download className="w-4 h-4" /> Baixar
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}

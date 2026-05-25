@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import Stepper from "@/components/Stepper";
 import ImageUpload from "@/components/ImageUpload";
 import CreditsBadge from "@/components/CreditsBadge";
+import { CTASelector } from "@/components/CTASelector";
 import { ArrowLeft, ArrowRight, Sparkles, Zap, Building2, Images, X, Pencil } from "lucide-react";
 import {
   Dialog,
@@ -371,36 +372,11 @@ const CreateCreative = () => {
             format,
             caption,
           },
-          credits_used: 1,
+          credits_used: 10,
         });
       }
 
-      const usedCredits = generatedImages.length || quantity;
-      const { data: freshCredits } = await supabase
-        .from("user_credits")
-        .select("credits_balance, credits_used")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!freshCredits || freshCredits.credits_balance < usedCredits) {
-        throw new Error("Créditos insuficientes");
-      }
-
-      await supabase
-        .from("user_credits")
-        .update({
-          credits_balance: freshCredits.credits_balance - usedCredits,
-          credits_used: freshCredits.credits_used + usedCredits,
-        })
-        .eq("user_id", user.id);
-
-      await supabase.from("credit_transactions").insert({
-        user_id: user.id,
-        type: "usage",
-        amount: -usedCredits,
-        description: `Criativos gerados: ${productName} (${angle.angle_name})`,
-      });
-
+      // Créditos deduzidos server-side pela Edge Function — apenas invalida a query local
       queryClient.invalidateQueries({ queryKey: ["credits"] });
       queryClient.invalidateQueries({ queryKey: ["creative-requests"] });
 
@@ -616,27 +592,11 @@ const CreateCreative = () => {
                   <h2 className="text-xl font-display text-foreground mb-2">Call to Action</h2>
                   <p className="text-muted-foreground text-sm">Defina o CTA do seu anúncio (opcional)</p>
                 </div>
-                <div className="space-y-3">
-                  <Label className="text-sm text-muted-foreground">Sugestões de CTA</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {["Clique em Saiba Mais", "Fale Conosco", "Assistir Mais", "Cadastre-se Agora", "Obter Oferta"].map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        onClick={() => setCta(suggestion)}
-                        className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
-                          cta === suggestion
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background/50 text-muted-foreground border-border hover:border-primary/50"
-                        }`}
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                  <Label className="text-sm text-muted-foreground">CTA personalizado</Label>
-                  <Input value={cta} onChange={(e) => setCta(e.target.value)} placeholder='Ex: "Compre agora com 30% OFF"' className="bg-background/50 border-border" />
-                </div>
+                <CTASelector
+                  value={cta}
+                  onChange={setCta}
+                  placeholder='Ex: "Compre agora com 30% OFF"'
+                />
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Orientações adicionais (opcional)</Label>
                   <Textarea
@@ -778,7 +738,7 @@ const CreateCreative = () => {
               </div>
 
               {/* Image thumbnails */}
-              {selectedAngle !== null && images.length > 0 && (
+              {selectedAngle !== null && (images.length > 0 || (includeLogo && !!selectedBrand?.logo_url)) && (
                 <div className="flex gap-3 flex-wrap animate-fade-in">
                   {images.map((file, idx) => (
                     <div key={idx} className="relative group w-20 h-20 shrink-0">

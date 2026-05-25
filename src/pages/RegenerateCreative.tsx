@@ -24,6 +24,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { useBrandContext } from "@/contexts/BrandContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { CTASelector } from "@/components/CTASelector";
 
 interface VisualConcept {
   visual_description: string;
@@ -441,34 +442,15 @@ const RegenerateCreative = () => {
             <div className="space-y-5">
               {editableFields.map(({ icon: Icon, label, value, onChange, type }) => (
                 <div key={label}>
-                  {label === "CTA" && (
-                    <div className="mb-3">
-                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Sugestões de CTA</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {["Clique em Saiba Mais", "Fale Conosco", "Assistir Mais", "Cadastre-se Agora", "Obter Oferta"].map((suggestion) => (
-                          <button
-                            key={suggestion}
-                            type="button"
-                            onClick={() => setCta(suggestion)}
-                            className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
-                              cta === suggestion
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-background/50 text-muted-foreground border-border hover:border-primary/50"
-                            }`}
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                   <div className="flex items-start gap-3">
                     <div className="mt-2 flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 shrink-0">
                       <Icon className="w-4 h-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0 space-y-1">
                       <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</Label>
-                      {type === "textarea" ? (
+                      {label === "CTA" ? (
+                        <CTASelector value={value} onChange={onChange} placeholder='Ex: "Compre agora com 30% OFF"' />
+                      ) : type === "textarea" ? (
                         <Textarea value={value} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[72px] bg-background/50" />
                       ) : (
                         <Input value={value} onChange={(e) => onChange(e.target.value)} className="text-sm bg-background/50" />

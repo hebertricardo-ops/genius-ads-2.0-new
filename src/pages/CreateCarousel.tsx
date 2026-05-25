@@ -29,6 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
 import GenerationProgress from "@/components/GenerationProgress";
+import { CTASelector } from "@/components/CTASelector";
 
 const STEPS = ["Produto", "Persuasão", "Estratégia", "Criar"];
 const CREDITS_PER_SLIDE = 10;
@@ -389,28 +390,7 @@ const CreateCarousel = () => {
         credits_used: CREDITS_PER_SLIDE,
       });
 
-      const { data: freshCredits } = await supabase
-        .from("user_credits")
-        .select("credits_balance, credits_used")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!freshCredits || freshCredits.credits_balance < CREDITS_PER_SLIDE) {
-        throw new Error("Créditos insuficientes");
-      }
-
-      await supabase.from("user_credits").update({
-        credits_balance: freshCredits.credits_balance - CREDITS_PER_SLIDE,
-        credits_used: freshCredits.credits_used + CREDITS_PER_SLIDE,
-      }).eq("user_id", user.id);
-
-      await supabase.from("credit_transactions").insert({
-        user_id: user.id,
-        type: "usage",
-        amount: -CREDITS_PER_SLIDE,
-        description: `Slide ${slide.slide_number} do carrossel: ${productName}`,
-      });
-
+      // Créditos deduzidos server-side pela Edge Function — apenas invalida a query local
       queryClient.invalidateQueries({ queryKey: ["credits"] });
 
       setSlideStates(prev => prev.map((s, i) => i === slideIndex ? { ...s, loading: false, imageUrl } : s));
@@ -569,26 +549,8 @@ const CreateCarousel = () => {
           credits_used: CREDITS_PER_SLIDE,
         });
 
-        const { data: freshCredits } = await supabase
-          .from("user_credits")
-          .select("credits_balance, credits_used")
-          .eq("user_id", user.id)
-          .single();
-
-        if (freshCredits && freshCredits.credits_balance >= CREDITS_PER_SLIDE) {
-          await supabase.from("user_credits").update({
-            credits_balance: freshCredits.credits_balance - CREDITS_PER_SLIDE,
-            credits_used: freshCredits.credits_used + CREDITS_PER_SLIDE,
-          }).eq("user_id", user.id);
-          await supabase.from("credit_transactions").insert({
-            user_id: user.id,
-            type: "usage",
-            amount: -CREDITS_PER_SLIDE,
-            description: `Slide ${slide.slide_number} do carrossel: ${productName}`,
-          });
-        }
-
         setGenStatusMessage(`Slide ${slideNum} — concluído ✓`);
+        // Créditos deduzidos server-side pela Edge Function — apenas invalida a query local
         queryClient.invalidateQueries({ queryKey: ["credits"] });
         setSlideStates(prev => prev.map((s, i) => i === idx ? { ...s, loading: false, imageUrl } : s));
         collectedUrls[idx] = imageUrl;
@@ -835,30 +797,10 @@ const CreateCarousel = () => {
 
                 <div className="space-y-3">
                   <Label className="text-foreground font-display mb-2 block">CTA do slide final (opcional)</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      "Compre agora", "Saiba mais", "Garanta o seu", "Quero aproveitar",
-                      "Comece hoje", "Fale conosco", "Teste grátis", "Aproveite a oferta",
-                    ].map((ctaOption) => (
-                      <button
-                        key={ctaOption}
-                        type="button"
-                        onClick={() => setCarouselCta(carouselCta === ctaOption ? "" : ctaOption)}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all duration-200 ${
-                          carouselCta === ctaOption
-                            ? "border-primary bg-primary/10 text-primary shadow-md scale-105"
-                            : "border-border bg-background/50 text-muted-foreground hover:border-primary/50 hover:bg-primary/5"
-                        }`}
-                      >
-                        {ctaOption}
-                      </button>
-                    ))}
-                  </div>
-                  <Input
+                  <CTASelector
                     value={carouselCta}
-                    onChange={(e) => setCarouselCta(e.target.value)}
+                    onChange={setCarouselCta}
                     placeholder="Ou digite um CTA personalizado..."
-                    className="bg-background/50"
                   />
                 </div>
 

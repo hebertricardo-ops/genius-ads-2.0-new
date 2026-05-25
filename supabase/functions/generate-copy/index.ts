@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +13,7 @@ REGRAS OBRIGATÓRIAS:
 - Headline com gancho forte e impactante
 - Linguagem clara, persuasiva e direta — nada genérico
 - Foco total em conversão
-- CTA: o texto exato do CTA informado pelo usuário DEVE aparecer integralmente no campo cta. Você pode adicionar uma frase curta de gatilho (urgência ou curiosidade) antes ou depois, mas nunca substituir, parafrasear ou omitir o CTA original. Exemplo: se o usuário informou "Clique em Saiba Mais", o campo cta deve conter "Clique em Saiba Mais" literalmente.
+- CTA coerente com o que o usuário informou
 - Textos curtos — pense em criativo estático de anúncio, não em artigo
 - Subheadline é opcional — use apenas quando agregar valor
 - Todas as copies em português do Brasil
@@ -33,7 +33,7 @@ PRINCÍPIOS OBRIGATÓRIOS DO CONCEITO VISUAL:
 - Design premium com hierarquia visual clara e composição equilibrada
 - Rico em elementos gráficos temáticos, mas cada elemento tem propósito — sem excesso
 - Identifique o produto e nicho para sugerir elementos visuais alinhados (ícones, badges, selos, texturas, partículas)
-- O CTA deve ser destacado com botão, faixa ou elemento visual chamativo
+- REGRA DE CTA — INSTRUÇÃO CRÍTICA: O CTA base fornecido pelo usuário é INTOCÁVEL e deve aparecer LITERALMENTE no CTA final. PROIBIDO substituir, parafrasear ou omitir qualquer palavra do CTA base. Formato obrigatório: [CTA BASE EXATO] + [complemento opcional com gatilho de urgência ou curiosidade]. EXEMPLO CORRETO (CTA base: "Clique em Saiba Mais"): ✅ "Clique em Saiba Mais e transforme sua criação de anúncios hoje" ✅ "Clique em Saiba Mais — seu próximo criativo leva 60 segundos" ✅ "Clique em Saiba Mais agora". EXEMPLO ERRADO — TERMINANTEMENTE PROIBIDO: ❌ "Clique e mude sua forma de fazer anúncios agora" ❌ "Descubra como criar anúncios em 60 segundos" ❌ Qualquer CTA que não comece com as palavras exatas do CTA base. O CTA deve ser destacado com botão, faixa ou elemento visual chamativo.
 - Exemplos por nicho: fitness → halteres, chamas, troféus; beleza → florais, brilhos, pétalas; educação → livros, lâmpadas, estrelas; tech → circuitos, partículas, gradientes; alimentação → ingredientes, vapor, texturas orgânicas`;
 
 const tools = [
@@ -166,16 +166,16 @@ ${creative_style ? `Estilo visual desejado: ${creative_style}` : ""}
 
 ⚠️ REGRA DE CTA — OBRIGATÓRIA: O texto "${cta || "Compre agora"}" deve aparecer EXATAMENTE e INTEGRALMENTE no campo cta de cada ângulo. Você pode complementar com uma frase curta de gatilho (urgência ou curiosidade) posicionada antes ou depois, mas o texto original NÃO pode ser alterado, substituído ou parafraseado. Exemplos válidos: "Só hoje! ${cta || "Compre agora"}" ou "${cta || "Compre agora"} — vagas limitadas". Exemplos INVÁLIDOS: qualquer versão que não contenha "${cta || "Compre agora"}" literalmente.
 
-REGRA DE LEGENDAS: Gere também 3 opções de legenda. Estrutura: 1) Gancho forte, 2) Desenvolvimento persuasivo (2-3 frases curtas), 3) CTA final. Máximo 280 caracteres por legenda.${additional_instructions ? `\n\nLEMBRETE FINAL: A instrução prioritária "${additional_instructions}" deve estar refletida em todos os elementos gerados.` : ""}`;
+REGRA DE LEGENDAS: Gere também 3 opções de legenda. Estrutura: 1) Gancho forte, 2) Desenvolvimento persuasivo (2-3 frases curtas), 3) CTA final. Máximo 280 caracteres por legenda.${additional_instructions ? `\n\nLEMBRETE FINAL: A instrução prioritária "${additional_instructions}" deve estar refletida em todos os elementos gerados.` : ""}\n\nLEMBRETE CRÍTICO — INSTRUÇÃO INVIOLÁVEL: O CTA de TODOS os ângulos DEVE começar obrigatoriamente com as palavras exatas: "${cta || "Compre agora"}". É PROIBIDO usar qualquer outro CTA que não inicie com essa frase. Complementos são permitidos após as palavras do CTA base, mas as palavras originais devem estar presentes e inalteradas.`;
 
     let response;
     try {
-      console.log("Attempting with gpt-4o-mini...");
-      response = await callOpenAI("gpt-4o-mini", effectiveSystemPrompt, userPrompt, 90000);
+      console.log("Attempting with gpt-4.1-mini...");
+      response = await callOpenAI("gpt-4.1-mini", effectiveSystemPrompt, userPrompt, 90000);
     } catch (e) {
       if (e.message === "TIMEOUT") {
-        console.log("Primary model timed out, retrying with gpt-4o...");
-        response = await callOpenAI("gpt-4o", effectiveSystemPrompt, userPrompt, 120000);
+        console.log("Primary model timed out, retrying with gpt-4.1...");
+        response = await callOpenAI("gpt-4.1", effectiveSystemPrompt, userPrompt, 120000);
       } else {
         throw e;
       }

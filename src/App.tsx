@@ -32,6 +32,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUse from "./pages/TermsOfUse";
 import Calendario from "./pages/Calendario";
 import SocialAccounts from "./pages/SocialAccounts";
+import CreativeEditor from "./pages/CreativeEditor";
 import { BrandProvider } from "@/contexts/BrandContext";
 
 const queryClient = new QueryClient();
@@ -78,6 +79,7 @@ const App = () => (
             <Route path="/subscription" element={<ProtectedWithLayout><Subscription /></ProtectedWithLayout>} />
             <Route path="/calendario" element={<ProtectedWithLayout><Calendario /></ProtectedWithLayout>} />
             <Route path="/social-accounts" element={<ProtectedWithLayout><SocialAccounts /></ProtectedWithLayout>} />
+            <Route path="/editor/:creativeId" element={<ProtectedRoute><BrandProvider><CreativeEditor /></BrandProvider></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
