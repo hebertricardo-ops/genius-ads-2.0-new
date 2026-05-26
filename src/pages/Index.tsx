@@ -120,8 +120,8 @@ const Index = () => {
             Começar agora
             <ArrowRight className="w-5 h-5" />
           </Button>
-          <Button variant="outline" size="lg" onClick={() => navigate("/signup")}>
-            Ver demo
+          <Button variant="outline" size="lg" onClick={() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" })}>
+            Ver Plano
           </Button>
         </div>
 
@@ -245,7 +245,7 @@ const Index = () => {
 
 
       {/* DOBRA 7 — Planos de Assinatura */}
-      <section className="max-w-5xl mx-auto px-4 py-20 pt-[60px]">
+      <section id="planos" className="max-w-5xl mx-auto px-4 py-20 pt-[60px]">
         <h2 className="text-2xl md:text-3xl font-display text-foreground mb-4 text-center">
           Escolha seu <span className="text-gradient">plano de assinatura</span>
         </h2>
