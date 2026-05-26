@@ -4,7 +4,7 @@
 **Repositório:** genius-ads-2.0 (GitHub)
 **Supabase Project Ref:** lovhzzlmuhjtbblnstfw
 **URL de Produção:** https://adsgenius.com.br
-**Última atualização:** 18 de maio de 2026
+**Última atualização:** 25 de maio de 2026
 
 ---
 
@@ -59,10 +59,19 @@ Todas as tabelas criadas com RLS ativo — usuário acessa apenas seus próprios
 | `subscriptions` | Assinaturas ativas por usuário | ✅ |
 | `content_calendar` | Calendário de postagens com status e agendamento social | ✅ |
 | `social_profiles` | Perfil de conexão com redes sociais via Upload-Post | ✅ |
+| `creative_edits` | Histórico de edições de criativos via IA (status, result_image_url, edit_element, créditos usados) | ✅ |
 | `email_send_log` | Log de todos os emails enviados | ✅ |
 | `email_send_state` | Configuração global da fila de email (singleton) | ✅ |
 | `suppressed_emails` | Lista de emails suprimidos (bounce/spam/unsub) | ✅ |
 | `email_unsubscribe_tokens` | Tokens de descadastro de email | ✅ |
+
+### Funções SQL
+
+| Função | O que faz |
+|---|---|
+| `handle_new_user()` | Cria registro em `profiles` ao criar usuário |
+| `handle_new_user_credits()` | Cria registro em `user_credits` com 4 créditos iniciais |
+| `deduct_credits(p_user_id, p_amount)` | Deduz créditos de forma atômica (`UPDATE WHERE credits_balance >= p_amount`); retorna JSONB `{success, new_balance}` ou `{success: false, error}`; `SECURITY DEFINER` — elimina race condition |
 
 ### Triggers automáticos em `auth.users`
 
@@ -89,6 +98,8 @@ Migrações aplicadas via `supabase db push` após a migração inicial do proje
 | `20260519000001_create_content_calendar.sql` | 19/05/2026 | Cria tabela `content_calendar` com campos de título, status, data, plataforma, tipo de conteúdo e referência a criativos |
 | `20260519000002_create_social_profiles.sql` | 19/05/2026 | Cria tabela `social_profiles` com username do Upload-Post, plataformas conectadas e status de conexão |
 | `20260519000003_add_scheduled_time_to_content_calendar.sql` | 19/05/2026 | Adiciona coluna `scheduled_time TIME` em `content_calendar` (armazenada separadamente do `scheduled_date DATE`) |
+| `20260521000000_add_deduct_credits_function.sql` | 21/05/2026 | Cria função SQL `deduct_credits` com `SECURITY DEFINER` para dedução atômica de créditos sem race condition |
+| `20260521100000_create_creative_edits_table.sql` | 21/05/2026 | Cria tabela `creative_edits` com RLS, 4 índices e trigger de `updated_at` para rastrear histórico de edições IA |
 
 ---
 
@@ -109,8 +120,9 @@ Migrações aplicadas via `supabase db push` após a migração inicial do proje
 
 | Função | Deploy | Status | Observações |
 |---|---|---|---|
-| `generate-copy` | ✅ | ✅ Funcionando | 3 ângulos + conceito visual por ângulo + 3 legendas |
-| `generate-creative` | ✅ | ✅ Funcionando | Modelo padrão: gpt-image-2/edit; nano-banana como backup |
+| `generate-copy` | ✅ | ✅ Funcionando | 3 ângulos + conceito visual + 3 legendas; regra de CTA com exemplos ✅/❌ no system prompt e LEMBRETE CRÍTICO no userPrompt |
+| `generate-creative` | ✅ | ✅ Funcionando | Modelo padrão: gpt-image-2/edit; créditos deduzidos de forma atômica via `deduct_credits` RPC após sucesso |
+| `edit-creative` | ✅ | ✅ Funcionando | Edição de criativo existente via gpt-image-2/edit; salva histórico em `creative_edits`; 5 créditos por edição |
 | `generate-brand-promise` | ✅ | ✅ Funcionando | Gera promessa principal via IA com base na marca |
 | `generate-carousel` | ✅ | ✅ Funcionando | Prompt JSON estruturado, logo por posição, retry automático |
 | `brand-scrape-website` | ✅ | ✅ Funcionando | Scraping de site via Firecrawl para pré-preenchimento de marca |
@@ -162,6 +174,8 @@ Migrações aplicadas via `supabase db push` após a migração inicial do proje
 | Página de redes sociais | `/social-accounts` | ✅ |
 | Conexão de contas sociais (Instagram, Facebook, TikTok) | `social-connect` | ✅ |
 | Promessa de marca gerada por IA | `generate-brand-promise` | ✅ |
+| Editor de criativo com IA | `/editor/:creativeId` | ✅ |
+| Seletor de CTA com presets | `CTASelector.tsx` (compartilhado) | ✅ |
 | Autenticação (login, cadastro, confirmação de email) | `/auth`, `/auth-callback` | ✅ |
 | Perfil do usuário | `/profile` | ✅ |
 
@@ -413,7 +427,37 @@ Ao abrir "Criar Criativo" ou "Novo Carrossel" com uma marca selecionada:
 - Dialog de resultado com grid de imagens, botão "Download ZIP" (JSZip) e "Salvar na Biblioteca"
 - Títulos das dialogs sem bold (font-normal)
 
+### CTASelector — componente compartilhado
+- Componente `src/components/CTASelector.tsx` com 17 presets organizados em duas categorias:
+  - **Conversão direta (6):** Saiba Mais, Cadastro, Contato, Oferta, Compre agora, Agende já
+  - **Engajamento orgânico (11):** Curtir, Marcar amigo, Salvar, Comentar, Seguir, Compartilhar e variações
+- Input de texto livre no topo + grid de chips de seleção rápida abaixo
+- Chip selecionado: `border-primary bg-primary/10 text-primary`
+- Aplicado em: `CreateCreative`, `CreateCarousel` e `RegenerateCreative` (substituiu chips inline anteriores)
+
+### Créditos atômicos — Edge Functions de imagem
+- **Problema anterior:** `generate-creative` e `generate-carousel` faziam SELECT seguido de UPDATE separados — sujeito a race condition
+- **Solução:** Função SQL `deduct_credits(p_user_id, p_amount)` com `SECURITY DEFINER` que executa `UPDATE WHERE credits_balance >= p_amount` em operação única
+- Fluxo correto: verificar saldo → gerar → deduzir (apenas após sucesso) → inserir em `credit_transactions`
+- **Frontend:** toda lógica de débito de créditos removida das páginas React; apenas `invalidateQueries(["credits"])` permanece
+
+### Dashboard — ajustes visuais
+- "Histórico recente" → "Últimas Criações"
+- "Ver tudo" → "Ver Biblioteca"
+- Card de criativos: `gradient-card border` → `bg-secondary/60` (mais escuro, sem borda interna)
+- Botão "Ver Biblioteca": `variant="outline"` → `variant="ghost" border-0`
+
+### Calendário — layout compacto de cards
+- `EventCard` com border-l-2 colorida por status, thumbnail 32×32, horário, ícone de plataforma e `StatusBadge`
+- Limite de 3 cards por célula; badge "+N mais" para o restante
+- `PlatformIcon`: lucide Instagram/Facebook para as plataformas nomeadas; emoji para tiktok/outros
+- Cores de borda por status: `idea=gray | draft=purple | ready=blue | scheduled=amber | published=green`
+- Campo de horário: substituído `<input type="time">` (AM/PM dependente de locale) por dois `<input type="number">` separados (HH: 0-23 e MM: 0-59) para garantir formato 24h
+
 ### History (Biblioteca)
+- Badge **"Edição IA"** (roxo com ícone Sparkles) exibido no canto superior esquerdo de criativos gerados via editor IA
+- Nome do card de edição exibe o `edit_label` da versão (ex: "Edição 1") em vez do nome do produto
+- Botão **"Editar IA"** adicionado no dialog de detalhe (apenas para criativos individuais, não carrosseis) — navega para `/editor/:creativeId` com `imageUrl` e `brandId` via `location.state`
 - Redesign completo do dialog de detalhe de criativo: layout single-column, imagem full-width, headline grande, data muted
 - Seção de legenda editável: textarea sempre editável, botão "Copiar", botão "Salvar" aparece somente quando há alteração
 - Botões de ação: Voltar, Baixar, Adaptar Formato, Regenerar, Excluir — todos em `text-xs px-2.5 h-8`
@@ -421,6 +465,42 @@ Ao abrir "Criar Criativo" ou "Novo Carrossel" com uma marca selecionada:
 - Navegação prev/next entre criativos com setas
 - Agrupamento de carrosseis: slides do mesmo `carousel_request_id` agrupados em um único tile com badge "N slides"
 - Dialog de carrossel: grid de slides ordenados por `slide_number`, download individual, botões Fechar/Regenerar/Excluir
+
+### Editor de Criativo com IA (`/editor/:creativeId`)
+
+Página full-screen (sem AppLayout/sidebar) acessível por:
+- Botão **"Editar"** em cada card de criativo na tela `/results/:requestId`
+- Botão **"Editar IA"** no dialog de detalhe da biblioteca (`/history`)
+
+#### Layout — 3 colunas + rodapé
+
+| Região | Componente | Conteúdo |
+|---|---|---|
+| Esquerda (w-44) | `ElementsPanel` | Lista de 8 elementos + 5 sugestões contextuais por elemento |
+| Centro (flex-1) | `CanvasPanel` | Imagem com zoom (+/-/reset), overlay de loading, label de versão |
+| Direita (w-72) | `ChatPanel` | Histórico de mensagens IA/usuário, textarea, botão enviar (Enter) |
+| Rodapé | `VersionHistory` | Scroll horizontal de thumbnails 48×48 com borda ativa |
+
+#### Elementos disponíveis
+`headline | body | cta | background | font_style | color_palette | image | free`
+
+#### Hook `useCreativeEditor`
+- Estado: `messages[]`, `versions[]`, `activeVersionIdx`, `selectedElement`, `isLoading`
+- `sendMessage()`: chama `edit-creative` com `source_image_url` da versão ativa; adiciona nova versão ao histórico
+- `selectVersion()`: alterna a imagem exibida no canvas sem perder o histórico
+
+#### Botão "Salvar Versão"
+- Desabilitado quando `activeVersionIdx === 0` (imagem original — nada editado)
+- Ao salvar: insere a imagem editada em `generated_creatives` com `request_id: null` e `copy_data.is_edit: true`
+- A imagem aparece na biblioteca como item independente (não agrupado com o criativo original)
+- `copy_data` inclui: `is_edit`, `edit_label`, `original_creative_id`
+
+#### Edge Function `edit-creative`
+- **Endpoint fal.ai:** `https://fal.run/openai/gpt-image-2/edit`
+- **Payload:** `prompt`, `image_urls: [source_image_url]`, `image_size: "square_hd"`, `quality: "medium"`, `num_images: 1`
+- **Prompt montado:** `Elemento a editar: {element}. Instrução: {user_message}. Preservar identidade visual...`
+- **Custo:** 5 créditos por edição (deduzidos atomicamente via `deduct_credits` RPC)
+- **Fluxo:** verificar saldo → insert `creative_edits` (status: processing) → fal.ai → upload Storage → update (status: completed) → deduzir créditos → insert `credit_transactions`
 
 ### `social_profiles` vinculado a `brand_id`
 - **Problema:** conexão de redes sociais era global por usuário — todas as marcas compartilhavam o mesmo perfil social
@@ -435,7 +515,7 @@ Ao abrir "Criar Criativo" ou "Novo Carrossel" com uma marca selecionada:
 
 ## Próxima Sessão — Retomar por aqui
 
-**Ponto de retomada:** Passo 8 — Mapear integração frontend ↔ backend
+**Ponto de retomada:** Integração de pagamentos e testes em produção
 
 ### Pendências conhecidas
 
@@ -444,10 +524,11 @@ Ao abrir "Criar Criativo" ou "Novo Carrossel" com uma marca selecionada:
 | 🔴 Alta | Testar webhooks Hotmart (`create-user-webhook`, `update-user-credit`) |
 | 🔴 Alta | Conectar botões de compra com `VITE_HOTMART_CHECKOUT_URL` |
 | 🔴 Alta | Configurar cenário no Make.com (webhook Hotmart → Edge Functions) |
+| 🔴 Alta | Aplicar migrações no banco remoto via `supabase db push` (`deduct_credits` + `creative_edits`) |
+| 🟡 Média | Deploy das Edge Functions novas/atualizadas (`edit-creative`, `generate-creative`, `generate-carousel`, `generate-copy`) |
 | 🟡 Média | Fluxo Instagram no Brand Setup (Apify — pendente de implementação) |
-| 🟡 Média | Revisar UX dos fluxos principais (Fase 5) |
-| 🟢 Baixa | Deploy frontend em produção (adsgenius.com.br) |
-| 🟢 Baixa | Smoke test completo end-to-end em produção |
+| 🟡 Média | ElementsPanel oculto em mobile — considerar drawer/bottom-sheet para mobile |
+| 🟢 Baixa | Smoke test completo end-to-end em produção (editor IA, biblioteca, calendário) |
 
 ---
 

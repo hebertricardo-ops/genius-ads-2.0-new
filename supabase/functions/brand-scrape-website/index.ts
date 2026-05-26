@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { isSvgUrl, fetchImageBuffer, convertSvgToPng } from "../_shared/image-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -141,8 +142,13 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_ANON_KEY")!,
     { global: { headers: { Authorization: authHeader } } }
   );
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return errorResponse("Unauthorized", 401);
+  const userId = user.id;
 
   let url: string;
   try {
@@ -227,10 +233,32 @@ serve(async (req) => {
       secondary: normalizeHex(branding?.colors?.secondary),
       accent:    normalizeHex(branding?.colors?.accent),
     };
-    const brandingLogoUrl: string | null = branding?.images?.logo ?? null;
+    const rawLogoUrl: string | null = branding?.images?.logo ?? null;
 
     console.log("[brand-scrape-website] branding colors:", brandingColors);
-    console.log("[brand-scrape-website] branding logo:", brandingLogoUrl);
+    console.log("[brand-scrape-website] branding logo (raw):", rawLogoUrl);
+
+    // Converter SVG para PNG se necessário
+    let brandingLogoUrl = rawLogoUrl;
+    if (rawLogoUrl && isSvgUrl(rawLogoUrl)) {
+      try {
+        const svgBuffer = await fetchImageBuffer(rawLogoUrl);
+        const pngBytes = await convertSvgToPng(svgBuffer);
+        const fileName = `logos/${userId}/${crypto.randomUUID()}.png`;
+        const { error: uploadErr } = await supabaseAdmin.storage
+          .from("creative-uploads")
+          .upload(fileName, pngBytes, { contentType: "image/png", upsert: false });
+        if (!uploadErr) {
+          const { data: urlData } = supabaseAdmin.storage
+            .from("creative-uploads")
+            .getPublicUrl(fileName);
+          brandingLogoUrl = urlData.publicUrl;
+          console.log("[brand-scrape-website] Logo SVG convertida para PNG:", brandingLogoUrl);
+        }
+      } catch (err) {
+        console.error("[brand-scrape-website] Falha ao converter logo SVG, usando URL original:", err);
+      }
+    }
 
     // ── Step 3: Brand info (text) via OpenAI + cores finais ───────────────────
     const hasBrandingColors = !!(brandingColors.primary && brandingColors.secondary);
