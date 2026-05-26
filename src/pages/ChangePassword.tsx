@@ -9,6 +9,8 @@ import { toast } from "sonner";
 
 const ChangePassword = () => {
   const navigate = useNavigate();
+  const isRecoveryFlow = new URLSearchParams(window.location.search).get("type") === "recovery"
+    || document.referrer.includes("/auth/callback");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -50,9 +52,13 @@ const ChangePassword = () => {
       <div className="gradient-card rounded-2xl p-10 border border-border shadow-card max-w-md w-full">
         <div className="text-center mb-8">
           <Lock className="h-12 w-12 text-primary mx-auto mb-4" />
-          <h1 className="text-2xl font-display text-foreground mb-2">Alterar senha</h1>
+          <h1 className="text-2xl font-display text-foreground mb-2">
+            {isRecoveryFlow ? "Criar nova senha" : "Alterar senha"}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Por segurança, altere sua senha temporária antes de continuar.
+            {isRecoveryFlow
+              ? "Defina sua nova senha de acesso ao Genius ADS."
+              : "Escolha uma nova senha para sua conta."}
           </p>
         </div>
 

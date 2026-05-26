@@ -2,12 +2,19 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import logoFull from "@/assets/logo-full.png";
 import bgSignUp from "@/assets/background-signup.png";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const formatWhatsApp = (value: string) => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -24,9 +31,13 @@ const Auth = () => {
   const [name, setName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, signIn, signUp } = useAuth();
+  const { user, signIn, signUp, resetPasswordForEmail } = useAuth();
 
   useEffect(() => {
     if (user) navigate("/dashboard", { replace: true });
@@ -40,6 +51,18 @@ const Auth = () => {
     if (message.includes("Invalid login credentials")) return "Email ou senha incorretos.";
     if (message.includes("Too many requests")) return "Muitas tentativas. Aguarde alguns minutos.";
     return "Ocorreu um erro. Tente novamente.";
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetEmail) return;
+    setIsResetting(true);
+    const { error } = await resetPasswordForEmail(resetEmail);
+    setIsResetting(false);
+    if (error) {
+      toast({ title: "Erro ao enviar email", description: "Verifique se o email está correto e tente novamente.", variant: "destructive" });
+      return;
+    }
+    setResetSent(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,6 +109,7 @@ const Auth = () => {
   };
 
   return (
+    <>
     <div className="min-h-screen gradient-hero relative flex items-center justify-center p-4">
       <div
         className="absolute inset-0 opacity-20 pointer-events-none"
@@ -132,6 +156,17 @@ const Auth = () => {
                 </button>
               </div>
             </div>
+            {isLogin && (
+              <div className="flex justify-end -mt-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowForgotPassword(true); setResetSent(false); setResetEmail(""); }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Esqueci minha senha
+                </button>
+              </div>
+            )}
             <Button type="submit" variant="hero" size="sm" className="w-full mt-1" disabled={loading}>
               {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar conta"}
               <ArrowRight className="w-3.5 h-3.5" />
@@ -156,6 +191,45 @@ const Auth = () => {
         </div>
       </div>
     </div>
+
+    <Dialog open={showForgotPassword} onOpenChange={(open) => { setShowForgotPassword(open); if (!open) setResetSent(false); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-normal">Recuperar senha</DialogTitle>
+          <DialogDescription>
+            Informe seu email e enviaremos um link para você criar uma nova senha.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="reset-email">Email</Label>
+            <Input
+              id="reset-email"
+              type="email"
+              placeholder="seu@email.com"
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleResetPassword()}
+              disabled={resetSent}
+            />
+          </div>
+          {resetSent ? (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
+              ✅ Email enviado! Verifique sua caixa de entrada e siga o link para criar uma nova senha.
+            </div>
+          ) : (
+            <Button className="w-full" onClick={handleResetPassword} disabled={isResetting || !resetEmail}>
+              {isResetting ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Enviando...</>
+              ) : (
+                "Enviar link de recuperação"
+              )}
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 

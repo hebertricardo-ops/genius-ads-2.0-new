@@ -8,17 +8,25 @@ const AuthCallback = () => {
   const handled = useRef(false);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const type = searchParams.get("type");
+    const isRecovery = type === "recovery";
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (handled.current) return;
       if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session) {
         handled.current = true;
-        toast.success("Email confirmado! Bem-vindo ao Genius ADS 🎉");
-        navigate("/dashboard", { replace: true });
+        if (isRecovery) {
+          navigate("/change-password", { replace: true });
+        } else {
+          toast.success("Email confirmado! Bem-vindo ao Genius ADS 🎉");
+          navigate("/dashboard", { replace: true });
+        }
       }
     });
 
     // PKCE flow: troca o code da URL por uma sessão
-    const code = new URLSearchParams(window.location.search).get("code");
+    const code = searchParams.get("code");
     if (code) {
       supabase.auth.exchangeCodeForSession(code).catch(() => {
         if (!handled.current) {
