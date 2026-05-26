@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const FAL_ENDPOINT = "https://fal.run/openai/gpt-image-2/edit";
-const CREDITS_PER_EDIT = 5;
+const CREDITS_PER_EDIT = 6;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });

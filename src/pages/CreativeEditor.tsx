@@ -239,7 +239,7 @@ function ChatPanel({
             {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
           </Button>
         </div>
-        <p className="text-[9px] text-muted-foreground mt-1 text-center">5 créditos por edição · Enter para enviar</p>
+        <p className="text-[9px] text-muted-foreground mt-1 text-center">6 créditos por edição · Enter para enviar</p>
       </div>
     </div>
   );
@@ -357,7 +357,7 @@ const CreativeEditor = () => {
           edit_label: currentVersion.label,
           original_creative_id: creativeId,
         },
-        credits_used: 5,
+        credits_used: 6,
       });
 
       if (error) throw error;
