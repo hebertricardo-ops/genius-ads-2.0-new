@@ -67,7 +67,7 @@ const SUBSCRIPTION_PLANS = [
     slug: "social-media",
     tagline: "Para social media managers e agências full-service",
     monthlyPrice: 199.90,
-    annualPrice: 1799.10,
+    annualPrice: 1799.16,
     credits: 2000,
     highlight: false,
     features: [
