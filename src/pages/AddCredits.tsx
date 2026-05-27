@@ -17,14 +17,6 @@ const packages = [
     cta: "COMPRAR PACOTE PLUS",
     checkoutUrl: "https://pay.hotmart.com/E105290250P?off=0eczkuvh&checkoutMode=10",
   },
-  {
-    name: "Master",
-    credits: 1000,
-    price: "R$ 129,90",
-    highlight: false,
-    cta: "COMPRAR PACOTE MASTER",
-    checkoutUrl: "https://pay.hotmart.com/E105290250P?off=p12z4pm0&checkoutMode=10",
-  },
 ];
 
 const AddCredits = () => {
