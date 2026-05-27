@@ -38,8 +38,8 @@ const SUBSCRIPTION_PLANS = [
       "Suporte via e-mail",
     ],
     cta: "Assinar Pro",
-    checkoutMonthly: "https://pay.hotmart.com/E105290250P?off=pro-monthly&checkoutMode=10",
-    checkoutAnnual:  "https://pay.hotmart.com/E105290250P?off=pro-annual&checkoutMode=10",
+    checkoutMonthly: "https://pay.hotmart.com/V106013862G?off=rzs761g9&checkoutMode=10",
+    checkoutAnnual:  "https://pay.hotmart.com/V106013862G?off=7pn98ant&checkoutMode=10",
   },
   {
     name: "Advanced",
@@ -59,8 +59,8 @@ const SUBSCRIPTION_PLANS = [
       "Suporte via WhatsApp",
     ],
     cta: "Assinar Advanced",
-    checkoutMonthly: "https://pay.hotmart.com/E105290250P?off=advanced-monthly&checkoutMode=10",
-    checkoutAnnual:  "https://pay.hotmart.com/E105290250P?off=advanced-annual&checkoutMode=10",
+    checkoutMonthly: "https://pay.hotmart.com/V106013862G?off=q4rfjdbx&checkoutMode=10",
+    checkoutAnnual:  "https://pay.hotmart.com/V106013862G?off=27arm6o7&checkoutMode=10",
   },
   {
     name: "Social Media",
@@ -80,8 +80,8 @@ const SUBSCRIPTION_PLANS = [
       "Suporte via WhatsApp",
     ],
     cta: "Assinar Social Media",
-    checkoutMonthly: "https://pay.hotmart.com/E105290250P?off=socialmedia-monthly&checkoutMode=10",
-    checkoutAnnual:  "https://pay.hotmart.com/E105290250P?off=socialmedia-annual&checkoutMode=10",
+    checkoutMonthly: "https://pay.hotmart.com/V106013862G?off=zgb0e3jz&checkoutMode=10",
+    checkoutAnnual:  "https://pay.hotmart.com/V106013862G?off=2oqov0t6&checkoutMode=10",
   },
 ];
 
