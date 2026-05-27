@@ -46,7 +46,7 @@ const SUBSCRIPTION_PLANS = [
     slug: "advanced",
     tagline: "Para agências e gestores que querem mais controle",
     monthlyPrice: 99.90,
-    annualPrice: 899.10,
+    annualPrice: 899.16,
     credits: 1000,
     highlight: true,
     features: [
