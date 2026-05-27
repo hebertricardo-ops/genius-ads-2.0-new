@@ -31,7 +31,7 @@ const AddCredits = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-xl mx-auto">
         {packages.map(({ name, credits, price, highlight, cta, checkoutUrl }) => (
           <div
             key={name}
