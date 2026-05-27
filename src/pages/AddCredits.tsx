@@ -7,7 +7,7 @@ const packages = [
     price: "R$ 49,90",
     highlight: false,
     cta: "COMPRAR PACOTE BÁSICO",
-    checkoutUrl: "https://pay.hotmart.com/E105290250P?off=1lncai6a&checkoutMode=10",
+    checkoutUrl: "https://pay.hotmart.com/V106013862G?off=neqe89bq&checkoutMode=10",
   },
   {
     name: "Plus",
@@ -15,7 +15,7 @@ const packages = [
     price: "R$ 79,90",
     highlight: true,
     cta: "COMPRAR PACOTE PLUS",
-    checkoutUrl: "https://pay.hotmart.com/E105290250P?off=0eczkuvh&checkoutMode=10",
+    checkoutUrl: "https://pay.hotmart.com/V106013862G?off=qilvstb0&checkoutMode=10",
   },
 ];
 
