@@ -121,7 +121,7 @@ const Index = () => {
             <ArrowRight className="w-5 h-5" />
           </Button>
           <Button variant="outline" size="lg" onClick={() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" })}>
-            Ver Plano
+            Ver Planos
           </Button>
         </div>
 
