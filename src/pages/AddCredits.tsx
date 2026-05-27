@@ -64,7 +64,7 @@ const AddCredits = () => {
             <Button
               variant={highlight ? "hero" : "outline"}
               size="sm"
-              className="w-full text-xs whitespace-normal text-center leading-tight py-2"
+              className="w-full text-[10px] whitespace-normal text-center leading-tight py-2"
               onClick={() => window.open(checkoutUrl, "_blank", "noopener,noreferrer")}
             >
               {cta}
