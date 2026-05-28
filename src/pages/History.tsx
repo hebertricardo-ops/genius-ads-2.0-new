@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import {
   Image, Download, Clock, Loader2, RefreshCw, Layers,
   Copy, Trash2, ChevronLeft, ChevronRight, Check,
-  MessageSquare, LayoutGrid, Sparkles, Smile, MoreHorizontal, Send, Pencil,
+  MessageSquare, LayoutGrid, Sparkles, Smile, MoreHorizontal, Send, Pencil, CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -109,6 +109,7 @@ const History = () => {
   const [postTarget, setPostTarget] = useState<{
     image_url: string; caption: string; title: string;
     creative_id?: string; brand_id?: string | null;
+    image_urls?: string[];
   } | null>(null);
   const [postPlatform, setPostPlatform] = useState("instagram");
   const [posting, setPosting] = useState(false);
@@ -388,7 +389,7 @@ const History = () => {
     }
   };
 
-  const openPostDialog = (imageUrl: string, caption: string, title: string, creativeId?: string, brandId?: string | null) => {
+  const openPostDialog = (imageUrl: string, caption: string, title: string, creativeId?: string, brandId?: string | null, imageUrls?: string[]) => {
     if (!hasSocialMedia) {
       setUpgradeOpen(true);
       return;
@@ -397,7 +398,7 @@ const History = () => {
       navigate("/social-accounts");
       return;
     }
-    setPostTarget({ image_url: imageUrl, caption, title, creative_id: creativeId, brand_id: brandId });
+    setPostTarget({ image_url: imageUrl, caption, title, creative_id: creativeId, brand_id: brandId, image_urls: imageUrls });
     setPostPlatform("instagram");
     setPostDialogOpen(true);
   };
@@ -407,11 +408,14 @@ const History = () => {
     setPosting(true);
     try {
       const platforms = postTarget ? (postPlatform === "both" ? ["instagram", "facebook"] : [postPlatform]) : [];
+      const isCarousel = (postTarget.image_urls?.length ?? 0) > 1;
       const { data, error } = await supabase.functions.invoke("social-publish", {
         body: {
           creative_id: postTarget.creative_id,
           brand_id: postTarget.brand_id,
           image_url: postTarget.image_url,
+          image_urls: isCarousel ? postTarget.image_urls : [postTarget.image_url],
+          is_carousel: isCarousel,
           caption: postTarget.caption,
           platforms,
           title: postTarget.title,
@@ -902,6 +906,24 @@ const History = () => {
                     >
                       <Send className="w-3 h-3" /> Postar
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs px-2.5 h-8"
+                      onClick={() => navigate("/calendario", {
+                        state: {
+                          scheduleCreative: {
+                            id: selectedCreative.id,
+                            image_url: selectedCreative.image_url,
+                            caption: captionValue,
+                            brand_id: selectedCreative.brand_id,
+                            title: info?.name ?? "Criativo",
+                          },
+                        },
+                      })}
+                    >
+                      <CalendarDays className="w-3 h-3" /> Agendar Postagem
+                    </Button>
                     {info?.type === "creative" && (
                       <Button
                         size="sm"
@@ -1126,6 +1148,7 @@ const History = () => {
                         carouselReq?.product_name ?? "Carrossel",
                         cover?.id,
                         cover?.brand_id,
+                        selectedCarousel.slides.map((s) => s.image_url).filter(Boolean),
                       );
                     }}
                   >

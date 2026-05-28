@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useBrandContext } from "@/contexts/BrandContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -133,6 +133,7 @@ const EventCard = ({ post, onClick }: { post: any; onClick: () => void }) => {
 
 const Calendario = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { selectedBrand } = useBrandContext();
   const { toast } = useToast();
@@ -352,6 +353,23 @@ const Calendario = () => {
     });
     setDialogOpen(true);
   };
+
+  // Abrir dialog pré-preenchido quando vindo da biblioteca com criativo selecionado
+  useEffect(() => {
+    const sc = (location.state as any)?.scheduleCreative;
+    if (!sc) return;
+    setEditingPost(null);
+    setForm({
+      ...emptyForm,
+      title: sc.title ?? "",
+      image_url: sc.image_url ?? "",
+      caption: sc.caption ?? "",
+      creative_id: sc.id ?? null,
+      status: "scheduled" as Status,
+    });
+    setDialogOpen(true);
+    window.history.replaceState({}, "");
+  }, []);
 
   const handleSave = async () => {
     if (!form.title.trim()) {

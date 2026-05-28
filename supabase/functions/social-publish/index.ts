@@ -34,6 +34,8 @@ serve(async (req) => {
       creative_id,
       brand_id,
       image_url,
+      image_urls,
+      is_carousel,
       caption,
       platforms,
       title,
@@ -43,6 +45,8 @@ serve(async (req) => {
       creative_id?: string;
       brand_id?: string;
       image_url: string;
+      image_urls?: string[];
+      is_carousel?: boolean;
       caption: string;
       platforms: string[];
       title: string;
@@ -75,8 +79,17 @@ serve(async (req) => {
     const uploadPostUsername = socialProfile.upload_post_username;
 
     // 2. Publicar / agendar via Upload-Post
+    const photos = (image_urls && image_urls.length > 0)
+      ? image_urls.filter(Boolean)
+      : [image_url];
+
     const formData = new FormData();
-    formData.append("photos[]", image_url);
+    for (const url of photos) {
+      formData.append("photos[]", url);
+    }
+    if (is_carousel && photos.length > 1) {
+      formData.append("post_type", "carousel");
+    }
     formData.append("user", uploadPostUsername);
     for (const platform of platforms) {
       formData.append("platform[]", platform);

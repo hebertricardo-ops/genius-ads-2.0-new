@@ -27,6 +27,7 @@ interface SocialPublishModalProps {
   open: boolean;
   onClose: () => void;
   imageUrl: string;
+  imageUrls?: string[];
   creativeId?: string;
   defaultCaption?: string;
   brandId?: string;
@@ -39,6 +40,7 @@ const SocialPublishModal = ({
   open,
   onClose,
   imageUrl,
+  imageUrls,
   creativeId,
   defaultCaption = "",
   brandId,
@@ -97,10 +99,14 @@ const SocialPublishModal = ({
     setPublishing(true);
     try {
       const title = caption.trim().slice(0, 60);
+      const allImageUrls = imageUrls && imageUrls.length > 0 ? imageUrls : [imageUrl];
+      const isCarousel = allImageUrls.length > 1;
       const result = await publishCreative({
         creative_id: creativeId,
         brand_id: brandId,
         image_url: imageUrl,
+        image_urls: allImageUrls,
+        is_carousel: isCarousel,
         caption: caption.trim(),
         platforms: selectedPlatforms,
         title,

@@ -21,6 +21,8 @@ export interface PublishData {
   creative_id?: string;
   brand_id?: string;
   image_url: string;
+  image_urls?: string[];
+  is_carousel?: boolean;
   caption: string;
   platforms: string[];
   title: string;
