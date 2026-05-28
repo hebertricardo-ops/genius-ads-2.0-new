@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Sparkles, LayoutList, ArrowRight, ImageIcon, Layers } from "lucide-react";
+import ObjectiveDialog from "@/components/ObjectiveDialog";
 
 interface CreateDialogProps {
   open: boolean;
@@ -16,19 +17,38 @@ interface CreateDialogProps {
 
 const CreateDialog = ({ open, onOpenChange }: CreateDialogProps) => {
   const navigate = useNavigate();
+  const [showObjective, setShowObjective] = useState(false);
+  const [pendingType, setPendingType] = useState<"creative" | "carousel" | null>(null);
 
-  const go = (path: string) => {
+  const handleTypeSelect = (type: "creative" | "carousel") => {
     onOpenChange(false);
-    navigate(path);
+    setPendingType(type);
+    setShowObjective(true);
+  };
+
+  const handleObjectiveConfirm = (
+    objective: "engajamento" | "venda",
+    method: "zero" | "ideia" | "link"
+  ) => {
+    setShowObjective(false);
+    const path = pendingType === "creative" ? "/create" : "/create-carousel";
+    navigate(path, { state: { objective, method } });
   };
 
   return (
+    <>
+    <ObjectiveDialog
+      open={showObjective}
+      onClose={() => setShowObjective(false)}
+      creationType={pendingType ?? "creative"}
+      onConfirm={handleObjectiveConfirm}
+    />
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
         {/* Header */}
         <div className="px-8 pt-8 pb-4">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-display text-foreground text-center">
+            <DialogTitle className="text-2xl font-display font-normal text-foreground text-center">
               O que você quer criar hoje?
             </DialogTitle>
             <p className="text-sm text-muted-foreground text-center mt-1">
@@ -42,7 +62,7 @@ const CreateDialog = ({ open, onOpenChange }: CreateDialogProps) => {
           {/* Card — Criativo Estático */}
           <button
             type="button"
-            onClick={() => go("/create")}
+            onClick={() => handleTypeSelect("creative")}
             className="group relative flex flex-col rounded-2xl border-2 border-border bg-background overflow-hidden text-left transition-all duration-200 hover:border-primary hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             {/* Illustration */}
@@ -105,7 +125,7 @@ const CreateDialog = ({ open, onOpenChange }: CreateDialogProps) => {
           {/* Card — Carrossel */}
           <button
             type="button"
-            onClick={() => go("/create-carousel")}
+            onClick={() => handleTypeSelect("carousel")}
             className="group relative flex flex-col rounded-2xl border-2 border-border bg-background overflow-hidden text-left transition-all duration-200 hover:border-primary hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             {/* Illustration */}
@@ -182,6 +202,7 @@ const CreateDialog = ({ open, onOpenChange }: CreateDialogProps) => {
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 };
 

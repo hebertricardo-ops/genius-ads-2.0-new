@@ -312,6 +312,21 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+
+              {/* Suporte */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/support"
+                    end
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                    activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                  >
+                    <HeadphonesIcon className="h-4 w-4 shrink-0" />
+                    {!collapsed && <span>Suporte</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -396,7 +411,7 @@ export function AppSidebar() {
                   Minha Assinatura
                 </DropdownMenuItem>
 
-                <DropdownMenuItem onClick={() => window.open("mailto:suporte@geniusads.com.br", "_blank")}>
+                <DropdownMenuItem onClick={() => navigate("/support")}>
                   <HeadphonesIcon className="h-4 w-4 mr-2" />
                   Suporte
                 </DropdownMenuItem>

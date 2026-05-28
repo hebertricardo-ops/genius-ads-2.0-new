@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -19,7 +18,10 @@ import {
 import Stepper from "@/components/Stepper";
 import ImageUpload from "@/components/ImageUpload";
 import CreditsBadge from "@/components/CreditsBadge";
-import { ArrowLeft, ArrowRight, Sparkles, Check, RefreshCw, Images, Building2, Loader2, Download, Library } from "lucide-react";
+import {
+  ArrowLeft, ArrowRight, Sparkles, Check, RefreshCw, Images,
+  Building2, Loader2, Download, Library, CheckCircle2,
+} from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,16 +33,7 @@ import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
 import GenerationProgress from "@/components/GenerationProgress";
 import { CTASelector } from "@/components/CTASelector";
 
-const STEPS = ["Produto", "Persuasão", "Estratégia", "Criar"];
 const CREDITS_PER_SLIDE = 10;
-
-const OBJECTIVES = [
-  { value: "vender diretamente", label: "Vender diretamente" },
-  { value: "gerar curiosidade", label: "Gerar curiosidade" },
-  { value: "educar / entregar valor", label: "Educar / Entregar valor" },
-  { value: "quebrar objeções", label: "Quebrar objeções" },
-  { value: "engajar", label: "Engajar (salvar, compartilhar)" },
-];
 
 interface CarouselSlide {
   slide_number: number;
@@ -65,6 +58,14 @@ interface SlideState {
   extraImages: File[];
   imageInstruction: string;
   useAiImage: boolean;
+}
+
+interface FormattedIdea {
+  promise: string;
+  pains: string;
+  benefits: string;
+  angle: string;
+  summary: string;
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -95,7 +96,21 @@ const BRAND_VISUAL_STYLE_MAP: Record<string, string> = {
 const CreateCarousel = () => {
   const location = useLocation();
   const prefill = (location.state as any)?.prefill;
+  const { objective = "venda", method = "zero" } = (location.state ?? {}) as {
+    objective?: "engajamento" | "venda";
+    method?: "zero" | "ideia" | "link";
+  };
 
+  // carousel_objective derived from objective selection
+  const carouselObjective = objective === "engajamento" ? "engajar" : "vender diretamente";
+
+  const STEPS =
+    method === "ideia" ? ["Produto", "Ideia", "Revisar", "Estratégia", "Criar"] :
+    method === "link"  ? ["Produto", "Link", "Criar"] :
+                         ["Produto", "Persuasão", "Estratégia", "Criar"];
+  const CRIAR_STEP = STEPS.length - 1;
+
+  // ── Core state ────────────────────────────────────────────────────────────
   const [step, setStep] = useState(0);
   const [images, setImages] = useState<File[]>([]);
   const [slidesCount, setSlidesCount] = useState(prefill?.slides_count ?? 6);
@@ -104,7 +119,6 @@ const CreateCarousel = () => {
   const [painPoints, setPainPoints] = useState(prefill?.pain_points ?? "");
   const [benefits, setBenefits] = useState(prefill?.benefits ?? "");
   const [objections, setObjections] = useState(prefill?.objections ?? "");
-  const [carouselObjective, setCarouselObjective] = useState(prefill?.carousel_objective ?? "vender diretamente");
   const [creativeStyle, setCreativeStyle] = useState(prefill?.creative_style ?? "");
   const [extraContext, setExtraContext] = useState(prefill?.extra_context ?? "");
   const [carouselCta, setCarouselCta] = useState(prefill?.cta ?? "");
@@ -124,6 +138,14 @@ const CreateCarousel = () => {
   const [dialogImages, setDialogImages] = useState<File[]>([]);
   const [dialogInstruction, setDialogInstruction] = useState("");
 
+  // Method-specific state
+  const [idea, setIdea] = useState("");
+  const [formattedIdea, setFormattedIdea] = useState<FormattedIdea | null>(null);
+  const [formattingIdea, setFormattingIdea] = useState(false);
+  const [link, setLink] = useState("");
+  const [linkScraped, setLinkScraped] = useState(false);
+  const [isScraping, setIsScraping] = useState(false);
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -131,7 +153,7 @@ const CreateCarousel = () => {
   const { selectedBrand } = useBrandContext();
   const queryClient = useQueryClient();
 
-  // Pre-fill from selected brand
+  // ── Brand pre-fill ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedBrand) return;
     const filled = new Set<string>();
@@ -169,7 +191,7 @@ const CreateCarousel = () => {
     setBrandFilledFields(filled);
   }, [selectedBrand?.id]);
 
-  // Auto-generate promise via AI if brand doesn't have one cached
+  // ── Auto-generate promise via AI ──────────────────────────────────────────
   useEffect(() => {
     if (!selectedBrand || selectedBrand.generated_promise) return;
     if (!selectedBrand.description && !selectedBrand.benefits?.length) return;
@@ -196,10 +218,17 @@ const CreateCarousel = () => {
     generate();
   }, [selectedBrand?.id]);
 
-  // Auto-trigger copy generation when arriving at step 3
+  // ── Auto-trigger copy generation at Criar step ────────────────────────────
   useEffect(() => {
-    if (step === 3 && !generatedCopy && !loadingCopy) {
+    if (step === CRIAR_STEP && !generatedCopy && !loadingCopy) {
       handleGenerateCopy();
+    }
+  }, [step]);
+
+  // ── Auto-format idea when entering review step ────────────────────────────
+  useEffect(() => {
+    if (method === "ideia" && step === 2 && !formattedIdea && !formattingIdea) {
+      handleFormatIdea();
     }
   }, [step]);
 
@@ -210,15 +239,85 @@ const CreateCarousel = () => {
       </span>
     ) : null;
 
+  // ── canProceed ────────────────────────────────────────────────────────────
   const canProceed = () => {
-    switch (step) {
-      case 0: return productName.trim() && mainPromise.trim();
-      case 1: return painPoints.trim() && benefits.trim();
-      case 2: return !!carouselObjective;
-      default: return false;
+    if (method === "zero") {
+      switch (step) {
+        case 0: return !!productName.trim() && !!mainPromise.trim();
+        case 1: return !!painPoints.trim() && !!benefits.trim();
+        case 2: return true; // Estratégia — all optional
+        default: return false;
+      }
+    }
+    if (method === "ideia") {
+      switch (step) {
+        case 0: return !!productName.trim() && !!mainPromise.trim();
+        case 1: return idea.trim().length > 0;
+        case 2: return !!formattedIdea;
+        case 3: return true; // Estratégia
+        default: return false;
+      }
+    }
+    if (method === "link") {
+      switch (step) {
+        case 0: return productName.trim().length > 0;
+        case 1: return linkScraped;
+        default: return false;
+      }
+    }
+    return false;
+  };
+
+  // ── handleFormatIdea ──────────────────────────────────────────────────────
+  const handleFormatIdea = async () => {
+    setFormattingIdea(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("format-idea", {
+        body: { idea, objective, product: productName },
+      });
+      if (error) throw error;
+      if (!data?.formatted) throw new Error("Resposta inválida da IA");
+
+      const f: FormattedIdea = data.formatted;
+      setFormattedIdea(f);
+
+      if (f.promise) { setMainPromise(f.promise); setBrandFilledFields((p) => new Set([...p, "mainPromise"])); }
+      if (f.pains)   { setPainPoints(f.pains);    setBrandFilledFields((p) => new Set([...p, "painPoints"])); }
+      if (f.benefits){ setBenefits(f.benefits);    setBrandFilledFields((p) => new Set([...p, "benefits"])); }
+    } catch (err: any) {
+      toast({ title: "Erro ao formatar ideia", description: err.message, variant: "destructive" });
+      setStep(1);
+    } finally {
+      setFormattingIdea(false);
     }
   };
 
+  // ── handleScrapeLink ──────────────────────────────────────────────────────
+  const handleScrapeLink = async () => {
+    if (!link.trim()) return;
+    setIsScraping(true);
+    try {
+      const { data: resp, error } = await supabase.functions.invoke("brand-scrape-website", {
+        body: { url: link },
+      });
+      if (error) throw error;
+      if (!resp?.success) throw new Error("Não foi possível analisar o link");
+
+      const d = resp.data;
+      if (d.name) setProductName(d.name);
+      if (d.description) setMainPromise(d.description);
+      if (d.audience_pains?.length) setPainPoints(Array.isArray(d.audience_pains) ? d.audience_pains.join("\n") : d.audience_pains);
+      if (d.benefits?.length) setBenefits(Array.isArray(d.benefits) ? d.benefits.join("\n") : d.benefits);
+      setLinkScraped(true);
+      toast({ title: "Link analisado!", description: "Informações extraídas com sucesso." });
+    } catch (err: any) {
+      toast({ title: "Erro ao analisar link", description: err.message || "Verifique o URL e tente novamente.", variant: "destructive" });
+    } finally {
+      setIsScraping(false);
+    }
+  };
+
+  // ── handleGenerateCopy ────────────────────────────────────────────────────
   const handleGenerateCopy = async () => {
     if (!user) return;
 
@@ -226,7 +325,7 @@ const CreateCarousel = () => {
     const creditsAvailable = credits?.credits_balance ?? 0;
     if (creditsAvailable < creditsNeeded) {
       setIsCreditsDialogOpen(true);
-      setStep(2);
+      setStep(CRIAR_STEP - 1);
       return;
     }
 
@@ -255,7 +354,6 @@ const CreateCarousel = () => {
       setGeneratedCopy(copy);
       setSlideStates(copy.slides.map(() => ({ loading: false, imageUrl: null, extraImages: [], imageInstruction: "", useAiImage: true })));
 
-      // Upload reference images once
       const imageUrls: string[] = [];
       for (const file of images) {
         const path = `${user.id}/${Date.now()}-${sanitizeFileName(file.name)}`;
@@ -301,7 +399,7 @@ const CreateCarousel = () => {
     } catch (err: any) {
       console.error(err);
       toast({ title: "Erro ao gerar copy", description: err.message || "Tente novamente.", variant: "destructive" });
-      setStep(2);
+      setStep(CRIAR_STEP - 1);
     } finally {
       setLoadingCopy(false);
     }
@@ -309,11 +407,9 @@ const CreateCarousel = () => {
 
   const resolveLogoUrl = async (): Promise<string | undefined> => {
     if (!selectedBrand?.logo_url) return undefined;
-    // Public Supabase URLs are already accessible — use as-is
     if (selectedBrand.logo_url.includes("/storage/v1/object/public/")) {
       return selectedBrand.logo_url;
     }
-    // Private/signed Supabase URLs — refresh the signed URL
     const privateMatch = selectedBrand.logo_url.match(
       /\/storage\/v1\/object\/sign\/creative-uploads\/(.+?)(?:\?|$)/
     );
@@ -323,7 +419,6 @@ const CreateCarousel = () => {
         .createSignedUrl(privateMatch[1], 3600);
       return signed?.signedUrl ?? selectedBrand.logo_url;
     }
-    // External URL (scraped logo etc.) — use as-is
     return selectedBrand.logo_url;
   };
 
@@ -335,7 +430,7 @@ const CreateCarousel = () => {
       return;
     }
 
-    setSlideStates(prev => prev.map((s, i) => i === slideIndex ? { ...s, loading: true } : s));
+    setSlideStates((prev) => prev.map((s, i) => i === slideIndex ? { ...s, loading: true } : s));
 
     try {
       const slide = generatedCopy.slides[slideIndex];
@@ -356,7 +451,6 @@ const CreateCarousel = () => {
 
       const allImageUrls = [...uploadedImageUrls, ...extraImageUrls];
       const logoUrl = await resolveLogoUrl();
-      // Logo visible on all slides except slide 1 and the last slide
       const includeLogoVisible = slide.slide_number !== 1 && slide.slide_number !== totalSlides;
 
       await supabase.auth.getSession();
@@ -390,26 +484,20 @@ const CreateCarousel = () => {
         credits_used: CREDITS_PER_SLIDE,
       });
 
-      // Créditos deduzidos server-side pela Edge Function — apenas invalida a query local
       queryClient.invalidateQueries({ queryKey: ["credits"] });
-
-      setSlideStates(prev => prev.map((s, i) => i === slideIndex ? { ...s, loading: false, imageUrl } : s));
+      setSlideStates((prev) => prev.map((s, i) => i === slideIndex ? { ...s, loading: false, imageUrl } : s));
 
       const updatedStates = slideStates.map((s, i) => i === slideIndex ? { ...s, imageUrl } : s);
-      if (updatedStates.every(s => s.imageUrl !== null)) {
+      if (updatedStates.every((s) => s.imageUrl !== null)) {
         await supabase.from("carousel_requests").update({ status: "completed" }).eq("id", requestId);
       }
 
       toast({ title: `Slide ${slide.slide_number} gerado!` });
     } catch (err: any) {
       console.error(err);
-      setSlideStates(prev => prev.map((s, i) => i === slideIndex ? { ...s, loading: false } : s));
+      setSlideStates((prev) => prev.map((s, i) => i === slideIndex ? { ...s, loading: false } : s));
       toast({ title: `Erro no slide ${slideIndex + 1}`, description: err.message || "Tente novamente.", variant: "destructive" });
     }
-  };
-
-  const handleSlideExtraImages = (slideIndex: number, files: File[]) => {
-    setSlideStates(prev => prev.map((s, i) => i === slideIndex ? { ...s, extraImages: files } : s));
   };
 
   const openImageDialog = (idx: number) => {
@@ -421,7 +509,7 @@ const CreateCarousel = () => {
   const confirmImageDialog = () => {
     if (imageDialogSlide === null) return;
     const hasImages = dialogImages.length > 0;
-    setSlideStates(prev => prev.map((s, i) =>
+    setSlideStates((prev) => prev.map((s, i) =>
       i === imageDialogSlide
         ? { ...s, extraImages: dialogImages, imageInstruction: dialogInstruction, useAiImage: hasImages ? false : s.useAiImage }
         : s
@@ -482,7 +570,6 @@ const CreateCarousel = () => {
       return;
     }
 
-    // Open generation dialog and reset progress
     setGenDialogDone(false);
     setGenProgressCurrent(0);
     setGenProgressTotal(toGenerate.length);
@@ -493,13 +580,11 @@ const CreateCarousel = () => {
     setGeneratingAll(true);
     const logoUrl = await resolveLogoUrl();
     const totalSlides = generatedCopy.slides.length;
-    // Local array to collect URLs in slide order across all retry rounds
     const collectedUrls: (string | null)[] = new Array(totalSlides).fill(null);
 
-    // Helper: generates a single slide, returns imageUrl on success or null on failure
     const generateSlide = async (idx: number, state: SlideState): Promise<string | null> => {
       const slideNum = generatedCopy.slides[idx].slide_number;
-      setSlideStates(prev => prev.map((s, i) => i === idx ? { ...s, loading: true } : s));
+      setSlideStates((prev) => prev.map((s, i) => i === idx ? { ...s, loading: true } : s));
       try {
         setGenStatusMessage(`Slide ${slideNum} — preparando referências...`);
         const extraImageUrls: string[] = [];
@@ -550,20 +635,18 @@ const CreateCarousel = () => {
         });
 
         setGenStatusMessage(`Slide ${slideNum} — concluído ✓`);
-        // Créditos deduzidos server-side pela Edge Function — apenas invalida a query local
         queryClient.invalidateQueries({ queryKey: ["credits"] });
-        setSlideStates(prev => prev.map((s, i) => i === idx ? { ...s, loading: false, imageUrl } : s));
+        setSlideStates((prev) => prev.map((s, i) => i === idx ? { ...s, loading: false, imageUrl } : s));
         collectedUrls[idx] = imageUrl;
-        setGenProgressCurrent(prev => prev + 1);
+        setGenProgressCurrent((prev) => prev + 1);
         return imageUrl;
       } catch (err: any) {
         console.error(`Error generating slide ${idx + 1}:`, err);
-        setSlideStates(prev => prev.map((s, i) => i === idx ? { ...s, loading: false } : s));
+        setSlideStates((prev) => prev.map((s, i) => i === idx ? { ...s, loading: false } : s));
         return null;
       }
     };
 
-    // Retry loop: up to MAX_RETRY_ROUNDS rounds until all slides have images
     const MAX_RETRY_ROUNDS = 3;
     const stateMap = new Map(toGenerate.map(({ idx, state }) => [idx, state]));
     let pendingIndices = toGenerate.map(({ idx }) => idx);
@@ -571,7 +654,7 @@ const CreateCarousel = () => {
     for (let round = 0; round < MAX_RETRY_ROUNDS && pendingIndices.length > 0; round++) {
       if (round > 0) {
         setGenStatusMessage(`Verificando slides — ${pendingIndices.length} sem imagem, retentando...`);
-        await new Promise(r => setTimeout(r, 3000));
+        await new Promise((r) => setTimeout(r, 3000));
       }
 
       const failedThisRound: number[] = [];
@@ -585,7 +668,6 @@ const CreateCarousel = () => {
     setGeneratingAll(false);
     await supabase.from("carousel_requests").update({ status: "completed" }).eq("id", requestId);
 
-    // Populate dialog results with all successfully generated URLs in slide order
     const finalUrls = collectedUrls.filter((u): u is string => u !== null);
     setGenDialogFinalUrls(finalUrls);
     setGenDialogDone(true);
@@ -599,8 +681,69 @@ const CreateCarousel = () => {
     }
   };
 
-  const generatedCount = slideStates.filter(s => s.imageUrl).length;
+  const generatedCount = slideStates.filter((s) => s.imageUrl).length;
   const allSlidesGenerated = generatedCopy && generatedCount === generatedCopy.slides.length;
+
+  // ── Estratégia step content (shared) ─────────────────────────────────────
+  const estrategiaStepContent = (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h2 className="text-xl font-display text-foreground">
+          Estilo do Carrossel<BrandBadge field="creativeStyle" />
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { value: "dark", label: "Dark / Escuro" },
+            { value: "light", label: "Claro / Light" },
+            { value: "clean", label: "Clean / Minimalista" },
+            { value: "premium", label: "Premium / Luxuoso" },
+            { value: "playful", label: "Infantil / Lúdico" },
+            { value: "tech", label: "Tecnológico / Futurista" },
+            { value: "vibrant", label: "Vibrante / Chamativo" },
+            { value: "corporate", label: "Corporativo / Profissional" },
+          ].map((style) => (
+            <button
+              key={style.value}
+              type="button"
+              onClick={() => setCreativeStyle(creativeStyle === style.value ? "" : style.value)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all duration-200 ${
+                creativeStyle === style.value
+                  ? "border-primary bg-primary/10 text-primary shadow-md scale-105"
+                  : "border-border bg-background/50 text-muted-foreground hover:border-primary/50 hover:bg-primary/5"
+              }`}
+            >
+              {style.label}
+            </button>
+          ))}
+        </div>
+        {!creativeStyle && (
+          <p className="text-xs text-muted-foreground">Nenhum estilo selecionado — a IA escolherá automaticamente.</p>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <Label className="text-foreground font-display mb-2 block">CTA do slide final (opcional)</Label>
+        <CTASelector
+          value={carouselCta}
+          onChange={setCarouselCta}
+          placeholder="Ou digite um CTA personalizado..."
+        />
+      </div>
+
+      <div>
+        <Label className="text-foreground font-display mb-2 block">
+          Contexto adicional (opcional)<BrandBadge field="extraContext" />
+        </Label>
+        <Textarea
+          value={extraContext}
+          onChange={(e) => setExtraContext(e.target.value)}
+          placeholder="Ex: público entre 25-40 anos, foco em Instagram..."
+          className="bg-background/50"
+          rows={3}
+        />
+      </div>
+    </div>
+  );
 
   if (!selectedBrand) {
     return (
@@ -634,12 +777,23 @@ const CreateCarousel = () => {
           <Stepper steps={STEPS} currentStep={step} />
         </div>
 
-        {/* Steps 0–2: wizard form */}
-        {step < 3 && (
+        {/* ── Wizard steps ───────────────────────────────────────────────── */}
+        {step < CRIAR_STEP && (
           <div className="gradient-card rounded-2xl p-8 border border-border shadow-card animate-fade-in">
-            {/* Step 0: Produto */}
+
+            {/* ── Step 0 — Produto (all methods) ── */}
             {step === 0 && (
               <div className="space-y-6">
+                {/* Objective / method badges */}
+                <div className="flex gap-2 flex-wrap">
+                  <Badge variant="outline">
+                    {objective === "engajamento" ? "🤝 Engajamento" : "💰 Venda"}
+                  </Badge>
+                  <Badge variant="outline">
+                    {method === "zero" ? "✨ Do Zero" : method === "ideia" ? "💡 Pela Ideia" : "🔗 Pelo Link"}
+                  </Badge>
+                </div>
+
                 <div>
                   <Label className="text-foreground font-display mb-2 block">
                     Nome do produto *<BrandBadge field="productName" />
@@ -652,26 +806,28 @@ const CreateCarousel = () => {
                   />
                 </div>
 
-                <div>
-                  <Label className="text-foreground font-display mb-2 flex items-center gap-2">
-                    Promessa principal *
-                    {generatingPromise && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
-                        <Sparkles className="w-2.5 h-2.5 animate-pulse" /> gerando...
-                      </span>
-                    )}
-                  </Label>
-                  <Textarea
-                    value={mainPromise}
-                    onChange={(e) => setMainPromise(e.target.value)}
-                    placeholder="Ex: Aprenda a criar anúncios que vendem em 30 dias"
-                    className="bg-background/50"
-                    rows={3}
-                    disabled={generatingPromise}
-                  />
-                </div>
+                {/* Promise hidden for link method */}
+                {method !== "link" && (
+                  <div>
+                    <Label className="text-foreground font-display mb-2 flex items-center gap-2">
+                      Promessa principal *
+                      {generatingPromise && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                          <Sparkles className="w-2.5 h-2.5 animate-pulse" /> gerando...
+                        </span>
+                      )}
+                    </Label>
+                    <Textarea
+                      value={mainPromise}
+                      onChange={(e) => setMainPromise(e.target.value)}
+                      placeholder="Ex: Aprenda a criar anúncios que vendem em 30 dias"
+                      className="bg-background/50"
+                      rows={3}
+                      disabled={generatingPromise}
+                    />
+                  </div>
+                )}
 
-                {/* Slides count */}
                 <div className="space-y-3">
                   <Label className="text-foreground font-display block">
                     Quantidade de slides
@@ -702,8 +858,8 @@ const CreateCarousel = () => {
               </div>
             )}
 
-            {/* Step 1: Persuasão */}
-            {step === 1 && (
+            {/* ── Step 1 — Persuasão (zero) ── */}
+            {step === 1 && method === "zero" && (
               <div className="space-y-6">
                 <div>
                   <Label className="text-foreground font-display mb-2 block">
@@ -742,112 +898,165 @@ const CreateCarousel = () => {
               </div>
             )}
 
-            {/* Step 2: Estratégia */}
-            {step === 2 && (
+            {/* ── Step 1 — Ideia (ideia method) ── */}
+            {step === 1 && method === "ideia" && (
               <div className="space-y-6">
                 <div>
-                  <Label className="text-foreground font-display mb-2 block">Objetivo do carrossel *</Label>
-                  <Select value={carouselObjective} onValueChange={setCarouselObjective}>
-                    <SelectTrigger className="bg-background/50">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {OBJECTIVES.map((obj) => (
-                        <SelectItem key={obj.value} value={obj.value}>
-                          {obj.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <h2 className="text-xl font-display text-foreground mb-2">Sua Ideia</h2>
+                  <p className="text-muted-foreground text-sm">Descreva o que você quer criar e a IA vai estruturar para você</p>
                 </div>
-
-                <div className="space-y-3">
-                  <h2 className="text-xl font-display text-foreground">
-                    Estilo do Carrossel<BrandBadge field="creativeStyle" />
-                  </h2>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { value: "dark", label: "Dark / Escuro" },
-                      { value: "light", label: "Claro / Light" },
-                      { value: "clean", label: "Clean / Minimalista" },
-                      { value: "premium", label: "Premium / Luxuoso" },
-                      { value: "playful", label: "Infantil / Lúdico" },
-                      { value: "tech", label: "Tecnológico / Futurista" },
-                      { value: "vibrant", label: "Vibrante / Chamativo" },
-                      { value: "corporate", label: "Corporativo / Profissional" },
-                    ].map((style) => (
-                      <button
-                        key={style.value}
-                        type="button"
-                        onClick={() => setCreativeStyle(creativeStyle === style.value ? "" : style.value)}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all duration-200 ${
-                          creativeStyle === style.value
-                            ? "border-primary bg-primary/10 text-primary shadow-md scale-105"
-                            : "border-border bg-background/50 text-muted-foreground hover:border-primary/50 hover:bg-primary/5"
-                        }`}
-                      >
-                        {style.label}
-                      </button>
-                    ))}
-                  </div>
-                  {!creativeStyle && (
-                    <p className="text-xs text-muted-foreground">Nenhum estilo selecionado — a IA escolherá automaticamente.</p>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-foreground font-display mb-2 block">CTA do slide final (opcional)</Label>
-                  <CTASelector
-                    value={carouselCta}
-                    onChange={setCarouselCta}
-                    placeholder="Ou digite um CTA personalizado..."
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-foreground font-display mb-2 block">
-                    Contexto adicional (opcional)<BrandBadge field="extraContext" />
-                  </Label>
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Descreva sua ideia *</Label>
                   <Textarea
-                    value={extraContext}
-                    onChange={(e) => setExtraContext(e.target.value)}
-                    placeholder="Ex: público entre 25-40 anos, foco em Instagram..."
-                    className="bg-background/50"
-                    rows={3}
+                    value={idea}
+                    onChange={(e) => setIdea(e.target.value)}
+                    placeholder="Ex: Quero criar um carrossel mostrando o passo a passo de como usar meu produto..."
+                    className="bg-background/50 border-border resize-none"
+                    rows={6}
                   />
                 </div>
               </div>
             )}
 
-            {/* Navigation */}
-            <div className="flex justify-between mt-8 pt-6 border-t border-border">
-              <Button
-                variant="outline"
-                onClick={() => step > 0 ? setStep(step - 1) : navigate("/dashboard")}
-              >
-                <ArrowLeft className="w-4 h-4" />
-                {step > 0 ? "Voltar" : "Dashboard"}
-              </Button>
+            {/* ── Step 1 — Link (link method) ── */}
+            {step === 1 && method === "link" && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-display text-foreground mb-2">Link do Produto</h2>
+                  <p className="text-muted-foreground text-sm">A IA vai extrair as informações automaticamente</p>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Cole o link do produto ou conteúdo *</Label>
+                    <Input
+                      type="url"
+                      placeholder="https://..."
+                      value={link}
+                      onChange={(e) => { setLink(e.target.value); setLinkScraped(false); }}
+                      className="bg-background/50 border-border"
+                    />
+                  </div>
+                  {!linkScraped && (
+                    <Button
+                      variant="outline"
+                      onClick={handleScrapeLink}
+                      disabled={isScraping || !link.trim().startsWith("http")}
+                    >
+                      {isScraping
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Analisando link...</>
+                        : "Analisar Link →"}
+                    </Button>
+                  )}
+                  {linkScraped && (
+                    <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 space-y-2">
+                      <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" /> Informações extraídas
+                      </p>
+                      {mainPromise && (
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Promessa:</strong> {mainPromise}
+                        </p>
+                      )}
+                      {painPoints && (
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Dores:</strong> {painPoints.split("\n").slice(0, 2).join(", ")}
+                        </p>
+                      )}
+                      {benefits && (
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Benefícios:</strong> {benefits.split("\n").slice(0, 2).join(", ")}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => setLinkScraped(false)}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Analisar outro link
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
-              {step < STEPS.length - 2 ? (
-                <Button variant="hero" onClick={() => setStep(step + 1)} disabled={!canProceed()}>
-                  Próximo <ArrowRight className="w-4 h-4" />
-                </Button>
-              ) : (
+            {/* ── Step 2 — Estratégia (zero) ── */}
+            {step === 2 && method === "zero" && estrategiaStepContent}
+
+            {/* ── Step 2 — Revisar (ideia method) ── */}
+            {step === 2 && method === "ideia" && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-display text-foreground mb-2">Revisar Ideia</h2>
+                  <p className="text-muted-foreground text-sm">A IA estruturou sua ideia — revise antes de continuar</p>
+                </div>
+
+                {formattingIdea && (
+                  <div className="flex flex-col items-center py-12 space-y-4">
+                    <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+                    <p className="text-muted-foreground text-sm">Formatando sua ideia...</p>
+                  </div>
+                )}
+
+                {!formattingIdea && formattedIdea && (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-border bg-background/50 p-5 space-y-4">
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Resumo</p>
+                        <p className="text-sm text-foreground leading-relaxed">{formattedIdea.summary}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Promessa Principal</p>
+                        <p className="text-sm text-foreground">{formattedIdea.promise}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Ângulo Criativo</p>
+                        <p className="text-sm text-foreground">{formattedIdea.angle}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-2 border-t border-border mt-6">
+                      <Button variant="outline" onClick={() => { setFormattedIdea(null); setStep(1); }}>
+                        <ArrowLeft className="w-4 h-4" /> Editar Ideia
+                      </Button>
+                      <Button variant="hero" onClick={() => setStep(3)}>
+                        Usar esta versão <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Step 3 — Estratégia (ideia method) ── */}
+            {step === 3 && method === "ideia" && estrategiaStepContent}
+
+            {/* ── Standard footer navigation (hidden on review step) ── */}
+            {!(method === "ideia" && step === 2) && (
+              <div className="flex justify-between mt-8 pt-6 border-t border-border">
                 <Button
-                  variant="hero"
-                  onClick={() => setStep(3)}
-                  disabled={!canProceed()}
+                  variant="outline"
+                  onClick={() => step > 0 ? setStep(step - 1) : navigate("/dashboard")}
                 >
-                  Próximo <ArrowRight className="w-4 h-4" />
+                  <ArrowLeft className="w-4 h-4" />
+                  {step > 0 ? "Voltar" : "Dashboard"}
                 </Button>
-              )}
-            </div>
+
+                {step === CRIAR_STEP - 1 ? (
+                  <Button variant="hero" onClick={() => setStep(CRIAR_STEP)} disabled={!canProceed()}>
+                    Próximo <ArrowRight className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <Button variant="hero" onClick={() => setStep(step + 1)} disabled={!canProceed()}>
+                    Próximo <ArrowRight className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Step 3: Criar */}
-        {step === 3 && (
+        {/* ── Criar step ─────────────────────────────────────────────────── */}
+        {step === CRIAR_STEP && (
           loadingCopy ? (
             <div className="flex flex-col items-center justify-center py-32 space-y-6 animate-fade-in">
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -874,7 +1083,6 @@ const CreateCarousel = () => {
                 </p>
               </div>
 
-              {/* Slide cards grid — square format */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {generatedCopy.slides.map((slide, idx) => {
                   const roleKey = slide.slide_role.toLowerCase();
@@ -886,7 +1094,6 @@ const CreateCarousel = () => {
                       key={idx}
                       className="relative aspect-square gradient-card rounded-2xl border border-border shadow-card overflow-hidden flex flex-col"
                     >
-                      {/* Loading overlay */}
                       {state?.loading && (
                         <div className="absolute inset-0 z-10 bg-background/85 flex flex-col items-center justify-center gap-2">
                           <Loader2 className="w-6 h-6 text-primary animate-spin" />
@@ -894,7 +1101,6 @@ const CreateCarousel = () => {
                         </div>
                       )}
 
-                      {/* Generated image overlay */}
                       {state?.imageUrl && !state?.loading && (
                         <div className="absolute inset-0 z-10">
                           <img
@@ -912,7 +1118,7 @@ const CreateCarousel = () => {
                               variant="outline"
                               size="sm"
                               className="w-full text-xs h-7 bg-background/80 backdrop-blur-sm"
-                              onClick={() => setSlideStates(prev => prev.map((s, i) => i === idx ? { ...s, imageUrl: null } : s))}
+                              onClick={() => setSlideStates((prev) => prev.map((s, i) => i === idx ? { ...s, imageUrl: null } : s))}
                             >
                               <RefreshCw className="w-3 h-3" /> Regenerar
                             </Button>
@@ -920,9 +1126,7 @@ const CreateCarousel = () => {
                         </div>
                       )}
 
-                      {/* Card content (slide copy) */}
                       <div className="flex flex-col h-full p-3">
-                        {/* Top: slide number + badge */}
                         <div className="flex items-center gap-1.5 mb-2 shrink-0">
                           <span className="text-[10px] font-bold text-muted-foreground leading-none">
                             {slide.slide_number}
@@ -932,12 +1136,10 @@ const CreateCarousel = () => {
                           </Badge>
                         </div>
 
-                        {/* Headline */}
                         <h3 className="text-sm font-display text-foreground leading-snug line-clamp-3 mb-1.5 shrink-0">
                           {slide.headline}
                         </h3>
 
-                        {/* Subheadline */}
                         {slide.subtext && (
                           <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 flex-1">
                             {slide.subtext}
@@ -946,14 +1148,12 @@ const CreateCarousel = () => {
 
                         {!slide.subtext && <div className="flex-1" />}
 
-                        {/* CTA */}
                         {slide.cta && (
                           <span className="mt-1.5 mb-1.5 self-start inline-block px-2 py-0.5 rounded gradient-primary text-primary-foreground text-[10px] font-semibold shrink-0">
                             {slide.cta}
                           </span>
                         )}
 
-                        {/* Divider + controls */}
                         {!state?.imageUrl && (
                           <div className="border-t border-border/50 mt-auto pt-2 space-y-2 shrink-0">
                             <button
@@ -971,7 +1171,7 @@ const CreateCarousel = () => {
                               <Switch
                                 checked={state?.useAiImage ?? true}
                                 onCheckedChange={(checked) =>
-                                  setSlideStates(prev => prev.map((s, i) => i === idx ? { ...s, useAiImage: checked } : s))
+                                  setSlideStates((prev) => prev.map((s, i) => i === idx ? { ...s, useAiImage: checked } : s))
                                 }
                                 className="scale-75 origin-left"
                               />
@@ -985,7 +1185,6 @@ const CreateCarousel = () => {
                 })}
               </div>
 
-              {/* Bottom actions */}
               <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-border">
                 <Button
                   variant="outline"
@@ -994,18 +1193,14 @@ const CreateCarousel = () => {
                     setGeneratedCopy(null);
                     setSlideStates([]);
                     setRequestId(null);
-                    setStep(2);
+                    setStep(CRIAR_STEP - 1);
                   }}
                 >
                   <RefreshCw className="w-4 h-4" /> Regenerar Copy
                 </Button>
 
                 {!allSlidesGenerated && (
-                  <Button
-                    variant="hero"
-                    onClick={handleGenerateAllSlides}
-                    disabled={generatingAll}
-                  >
+                  <Button variant="hero" onClick={handleGenerateAllSlides} disabled={generatingAll}>
                     {generatingAll ? (
                       <><Loader2 className="w-4 h-4 animate-spin" /> Gerando slides ({generatedCount}/{generatedCopy.slides.length})...</>
                     ) : (
@@ -1025,7 +1220,7 @@ const CreateCarousel = () => {
         )}
       </div>
 
-      {/* Image dialog for slide */}
+      {/* ── Image dialog for slide ────────────────────────────────────────── */}
       <Dialog open={imageDialogSlide !== null} onOpenChange={(open) => { if (!open) setImageDialogSlide(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1053,7 +1248,7 @@ const CreateCarousel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Generation progress / results dialog */}
+      {/* ── Generation progress dialog ───────────────────────────────────── */}
       <Dialog
         open={showGenDialog}
         onOpenChange={(open) => { if (!open && genDialogDone) setShowGenDialog(false); }}
@@ -1064,7 +1259,6 @@ const CreateCarousel = () => {
           onEscapeKeyDown={(e) => { if (!genDialogDone) e.preventDefault(); }}
         >
           {!genDialogDone ? (
-            /* ── Progress phase ── */
             <div className="py-4">
               <DialogHeader className="mb-6">
                 <DialogTitle className="flex items-center gap-2 font-normal">
@@ -1093,7 +1287,6 @@ const CreateCarousel = () => {
                     />
                   ))}
                 </div>
-                {/* Status message — animates on every sub-step change */}
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 min-h-[36px]">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />
                   <p className="text-xs text-muted-foreground transition-all duration-300 truncate">
@@ -1106,7 +1299,6 @@ const CreateCarousel = () => {
               </div>
             </div>
           ) : (
-            /* ── Results phase ── */
             <div>
               <DialogHeader className="mb-4">
                 <DialogTitle className="flex items-center gap-2 font-normal">
@@ -1116,7 +1308,6 @@ const CreateCarousel = () => {
               </DialogHeader>
 
               <div className={`grid gap-3 mb-6 ${
-                genDialogFinalUrls.length <= 2 ? "grid-cols-2" :
                 genDialogFinalUrls.length <= 4 ? "grid-cols-2" : "grid-cols-3"
               }`}>
                 {genDialogFinalUrls.map((url, i) => (

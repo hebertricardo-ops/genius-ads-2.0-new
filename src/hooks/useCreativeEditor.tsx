@@ -31,6 +31,7 @@ interface UseCreativeEditorReturn {
     editElement: string;
     originalCreativeId: string;
     brandId?: string | null;
+    format?: string;
   }) => Promise<void>;
   selectVersion: (idx: number) => void;
 }
@@ -68,11 +69,13 @@ export function useCreativeEditor(initialImageUrl: string): UseCreativeEditorRet
       editElement,
       originalCreativeId,
       brandId,
+      format,
     }: {
       userMessage: string;
       editElement: string;
       originalCreativeId: string;
       brandId?: string | null;
+      format?: string;
     }) => {
       if (!user || !userMessage.trim()) return;
 
@@ -107,6 +110,7 @@ export function useCreativeEditor(initialImageUrl: string): UseCreativeEditorRet
               edit_element: editElement,
               user_message: userMessage,
               brand_id: brandId ?? null,
+              format: format ?? "1:1",
             }),
           }
         );

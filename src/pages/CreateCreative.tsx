@@ -5,11 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import Stepper from "@/components/Stepper";
 import ImageUpload from "@/components/ImageUpload";
 import CreditsBadge from "@/components/CreditsBadge";
 import { CTASelector } from "@/components/CTASelector";
-import { ArrowLeft, ArrowRight, Sparkles, Zap, Building2, Images, X, Pencil } from "lucide-react";
+import {
+  ArrowLeft, ArrowRight, Sparkles, Zap, Building2, Images, X, Pencil,
+  Loader2, CheckCircle2,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +21,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useCredits } from "@/hooks/useCredits";
@@ -26,8 +30,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import InsufficientCreditsDialog from "@/components/InsufficientCreditsDialog";
 import GenerationProgress from "@/components/GenerationProgress";
-
-const STEPS = ["Produto", "Persuasão", "CTA", "Criar"];
 
 interface VisualConcept {
   visual_description: string;
@@ -48,6 +50,14 @@ interface CopyAngle {
   visual_concept: VisualConcept | null;
 }
 
+interface FormattedIdea {
+  promise: string;
+  pains: string;
+  benefits: string;
+  angle: string;
+  summary: string;
+}
+
 const BRAND_VISUAL_STYLE_MAP: Record<string, string> = {
   "Moderno Tecnológico": "tech",
   "Moderno Profissional": "corporate",
@@ -63,6 +73,19 @@ const BRAND_VISUAL_STYLE_MAP: Record<string, string> = {
 };
 
 const CreateCreative = () => {
+  const location = useLocation();
+  const { objective = "venda", method = "zero" } = (location.state ?? {}) as {
+    objective?: "engajamento" | "venda";
+    method?: "zero" | "ideia" | "link";
+  };
+
+  const STEPS =
+    method === "ideia" ? ["Produto", "Ideia", "Revisar", "CTA", "Criar"] :
+    method === "link"  ? ["Produto", "Link", "Criar"] :
+                         ["Produto", "Persuasão", "CTA", "Criar"];
+  const CRIAR_STEP = STEPS.length - 1;
+
+  // ── Core state ────────────────────────────────────────────────────────────
   const [step, setStep] = useState(0);
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -91,6 +114,15 @@ const CreateCreative = () => {
   const [generatingPromise, setGeneratingPromise] = useState(false);
   const [isCreditsDialogOpen, setIsCreditsDialogOpen] = useState(false);
   const [brandFilledFields, setBrandFilledFields] = useState<Set<string>>(new Set());
+
+  // ── Method-specific state ─────────────────────────────────────────────────
+  const [idea, setIdea] = useState("");
+  const [formattedIdea, setFormattedIdea] = useState<FormattedIdea | null>(null);
+  const [formattingIdea, setFormattingIdea] = useState(false);
+  const [link, setLink] = useState("");
+  const [linkScraped, setLinkScraped] = useState(false);
+  const [isScraping, setIsScraping] = useState(false);
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -98,7 +130,7 @@ const CreateCreative = () => {
   const { selectedBrand } = useBrandContext();
   const queryClient = useQueryClient();
 
-  // Pre-fill from selected brand
+  // ── Brand pre-fill ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedBrand) return;
     const filled = new Set<string>();
@@ -129,7 +161,7 @@ const CreateCreative = () => {
     setBrandFilledFields(filled);
   }, [selectedBrand?.id]);
 
-  // Generate promise via AI if brand doesn't have one yet
+  // ── Auto-generate promise via AI ──────────────────────────────────────────
   useEffect(() => {
     if (!selectedBrand || selectedBrand.generated_promise) return;
     if (!selectedBrand.description && !selectedBrand.benefits?.length) return;
@@ -149,11 +181,10 @@ const CreateCreative = () => {
         setPromise(data.promise);
         setBrandFilledFields((prev) => new Set([...prev, "promise"]));
 
-        // Persist so future sessions reuse this text
         await (supabase as any).from("brands").update({ generated_promise: data.promise }).eq("id", selectedBrand.id);
         queryClient.invalidateQueries({ queryKey: ["brands", user?.id] });
       } catch {
-        // Silently fail — user can fill the field manually
+        // silently fail
       } finally {
         setGeneratingPromise(false);
       }
@@ -162,22 +193,99 @@ const CreateCreative = () => {
     generate();
   }, [selectedBrand?.id]);
 
-  // Thumbnail preview URLs — revoke previous on change
+  // ── Image preview URLs ────────────────────────────────────────────────────
   useEffect(() => {
-    const urls = images.map(f => URL.createObjectURL(f));
+    const urls = images.map((f) => URL.createObjectURL(f));
     setImagePreviews(urls);
-    return () => urls.forEach(u => URL.revokeObjectURL(u));
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [images]);
 
+  // ── Auto-format idea when entering review step ────────────────────────────
+  useEffect(() => {
+    if (method === "ideia" && step === 2 && !formattedIdea && !formattingIdea) {
+      handleFormatIdea();
+    }
+  }, [step]);
+
+  // ── canProceed ────────────────────────────────────────────────────────────
   const canProceed = () => {
-    switch (step) {
-      case 0: return productName.trim().length > 0 && promise.trim().length > 0;
-      case 1: return pains.trim().length > 0 && benefits.trim().length > 0;
-      case 2: return true;
-      default: return false;
+    if (method === "zero") {
+      switch (step) {
+        case 0: return productName.trim().length > 0 && promise.trim().length > 0;
+        case 1: return pains.trim().length > 0 && benefits.trim().length > 0;
+        case 2: return true;
+        default: return false;
+      }
+    }
+    if (method === "ideia") {
+      switch (step) {
+        case 0: return productName.trim().length > 0 && promise.trim().length > 0;
+        case 1: return idea.trim().length > 0;
+        case 2: return !!formattedIdea;
+        case 3: return true;
+        default: return false;
+      }
+    }
+    if (method === "link") {
+      switch (step) {
+        case 0: return productName.trim().length > 0;
+        case 1: return linkScraped;
+        default: return false;
+      }
+    }
+    return false;
+  };
+
+  // ── handleFormatIdea ──────────────────────────────────────────────────────
+  const handleFormatIdea = async () => {
+    setFormattingIdea(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("format-idea", {
+        body: { idea, objective, product: productName },
+      });
+      if (error) throw error;
+      if (!data?.formatted) throw new Error("Resposta inválida da IA");
+
+      const f: FormattedIdea = data.formatted;
+      setFormattedIdea(f);
+
+      if (f.promise) { setPromise(f.promise); setBrandFilledFields((p) => new Set([...p, "promise"])); }
+      if (f.pains)   { setPains(f.pains);     setBrandFilledFields((p) => new Set([...p, "pains"])); }
+      if (f.benefits){ setBenefits(f.benefits); setBrandFilledFields((p) => new Set([...p, "benefits"])); }
+    } catch (err: any) {
+      toast({ title: "Erro ao formatar ideia", description: err.message, variant: "destructive" });
+      setStep(1);
+    } finally {
+      setFormattingIdea(false);
     }
   };
 
+  // ── handleScrapeLink ──────────────────────────────────────────────────────
+  const handleScrapeLink = async () => {
+    if (!link.trim()) return;
+    setIsScraping(true);
+    try {
+      const { data: resp, error } = await supabase.functions.invoke("brand-scrape-website", {
+        body: { url: link },
+      });
+      if (error) throw error;
+      if (!resp?.success) throw new Error("Não foi possível analisar o link");
+
+      const d = resp.data;
+      if (d.name) setProductName(d.name);
+      if (d.description) setPromise(d.description);
+      if (d.audience_pains?.length) setPains(Array.isArray(d.audience_pains) ? d.audience_pains.join("\n") : d.audience_pains);
+      if (d.benefits?.length) setBenefits(Array.isArray(d.benefits) ? d.benefits.join("\n") : d.benefits);
+      setLinkScraped(true);
+      toast({ title: "Link analisado!", description: "Informações extraídas com sucesso." });
+    } catch (err: any) {
+      toast({ title: "Erro ao analisar link", description: err.message || "Verifique o URL e tente novamente.", variant: "destructive" });
+    } finally {
+      setIsScraping(false);
+    }
+  };
+
+  // ── handleGenerate (copy generation) ─────────────────────────────────────
   const handleGenerate = async () => {
     if (!user) return;
     if ((credits?.credits_balance ?? 0) < quantity) {
@@ -212,6 +320,7 @@ const CreateCreative = () => {
           benefits,
           objections,
           cta,
+          objective,
           creative_style: creativeStyle || undefined,
           additional_instructions: additionalInstructions.trim() || undefined,
         },
@@ -255,10 +364,24 @@ const CreateCreative = () => {
     }
   };
 
+  // ── handleGenerateCreative ────────────────────────────────────────────────
   const handleGenerateCreative = async () => {
-    if (selectedAngle === null || !generatedAngles || !user) return;
-    const angle = generatedAngles[selectedAngle];
-    const visual = angle.visual_concept;
+    if (!user) return;
+    if (method === "ideia" && !formattedIdea) return;
+    if (method !== "ideia" && (selectedAngle === null || !generatedAngles)) return;
+
+    const angle = method !== "ideia" ? generatedAngles![selectedAngle!] : null;
+    const visual = method === "ideia"
+      ? {
+          visual_description: `Post com foco em: ${formattedIdea!.angle}`,
+          element_distribution: "Headline em destaque, corpo centralizado, CTA na base",
+          composition: "Layout limpo com hierarquia visual clara",
+          visual_hierarchy: "1º Headline → 2º Corpo → 3º CTA",
+          layout_style: creativeStyle || "Moderno Profissional",
+          cta_highlight: "Botão ou elemento destacado na base",
+          thematic_elements: "",
+        }
+      : angle?.visual_concept;
 
     if ((credits?.credits_balance ?? 0) < quantity) {
       toast({ title: "Créditos insuficientes", description: "Você não tem créditos suficientes para gerar.", variant: "destructive" });
@@ -267,7 +390,6 @@ const CreateCreative = () => {
 
     setGeneratingCreative(true);
     try {
-      // Upload product images
       const imageUrls: string[] = [];
       for (const file of images) {
         const path = `${user.id}/${Date.now()}-${sanitizeFileName(file.name)}`;
@@ -280,7 +402,6 @@ const CreateCreative = () => {
         imageUrls.push(signedUrlData.signedUrl);
       }
 
-      // Get accessible logo URL only if toggle is on
       let logoUrl: string | undefined;
       if (includeLogo && selectedBrand?.logo_url) {
         const supabaseMatch = selectedBrand.logo_url.match(
@@ -296,7 +417,6 @@ const CreateCreative = () => {
         }
       }
 
-      // Brand color palette
       const brandColors = [
         selectedBrand?.color_primary,
         selectedBrand?.color_secondary,
@@ -308,13 +428,13 @@ const CreateCreative = () => {
           image_urls: imageUrls,
           logo_url: logoUrl,
           product_name: productName,
-          promise,
-          pains,
-          benefits,
+          promise: method === "ideia" ? formattedIdea!.promise : promise,
+          pains: method === "ideia" ? formattedIdea!.pains : pains,
+          benefits: method === "ideia" ? formattedIdea!.benefits : benefits,
           objections: objections || null,
-          headline: angle.headline,
-          body: angle.body,
-          cta: angle.cta,
+          headline: method === "ideia" ? formattedIdea!.angle : angle!.headline,
+          body: method === "ideia" ? formattedIdea!.summary : angle!.body,
+          cta: method === "ideia" ? (cta || "Saiba mais") : angle!.cta,
           visual_option: visual ? {
             visual_description: visual.visual_description,
             element_distribution: visual.element_distribution,
@@ -363,11 +483,11 @@ const CreateCreative = () => {
           request_id: requestId || null,
           brand_id: selectedBrand?.id ?? null,
           copy_data: {
-            angle_name: angle.angle_name,
-            headline: angle.headline,
-            subheadline: angle.subheadline,
-            body: angle.body,
-            cta: angle.cta,
+            angle_name: method === "ideia" ? "Ideia formatada" : angle!.angle_name,
+            headline: method === "ideia" ? formattedIdea!.angle : angle!.headline,
+            subheadline: method === "ideia" ? undefined : angle!.subheadline,
+            body: method === "ideia" ? formattedIdea!.summary : angle!.body,
+            cta: method === "ideia" ? (cta || "Saiba mais") : angle!.cta,
             visual_option: visual ?? null,
             format,
             caption,
@@ -376,7 +496,6 @@ const CreateCreative = () => {
         });
       }
 
-      // Créditos deduzidos server-side pela Edge Function — apenas invalida a query local
       queryClient.invalidateQueries({ queryKey: ["credits"] });
       queryClient.invalidateQueries({ queryKey: ["creative-requests"] });
 
@@ -394,6 +513,7 @@ const CreateCreative = () => {
     }
   };
 
+  // ── Image dialog helpers ──────────────────────────────────────────────────
   const openAddDialog = () => {
     setEditingImageIdx(null);
     setDialogImage([]);
@@ -418,15 +538,15 @@ const CreateCreative = () => {
       newInstructions[editingImageIdx] = dialogInstruction;
       setImageInstructions(newInstructions);
     } else {
-      setImages(prev => [...prev, dialogImage[0]]);
-      setImageInstructions(prev => [...prev, dialogInstruction]);
+      setImages((prev) => [...prev, dialogImage[0]]);
+      setImageInstructions((prev) => [...prev, dialogInstruction]);
     }
     setImageDialogOpen(false);
   };
 
   const removeImage = (idx: number) => {
-    setImages(prev => prev.filter((_, i) => i !== idx));
-    setImageInstructions(prev => prev.filter((_, i) => i !== idx));
+    setImages((prev) => prev.filter((_, i) => i !== idx));
+    setImageInstructions((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const resetWizard = () => {
@@ -436,6 +556,10 @@ const CreateCreative = () => {
     setImageInstructions([]);
     setSelectedAngle(null);
     setImageDialogOpen(false);
+    setIdea("");
+    setFormattedIdea(null);
+    setLink("");
+    setLinkScraped(false);
   };
 
   const BrandBadge = ({ field }: { field: string }) =>
@@ -446,6 +570,31 @@ const CreateCreative = () => {
     ) : null;
 
   const angleLabels = ["🔴 Dor Principal", "🟢 Transformação", "🟡 Quebra de Objeção"];
+
+  // ── CTA step content (shared between zero/step2 and ideia/step3) ──────────
+  const ctaStepContent = (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-display text-foreground mb-2">Call to Action</h2>
+        <p className="text-muted-foreground text-sm">Defina o CTA do seu anúncio (opcional)</p>
+      </div>
+      <CTASelector
+        value={cta}
+        onChange={setCta}
+        placeholder='Ex: "Compre agora com 30% OFF"'
+      />
+      <div className="space-y-2">
+        <Label className="text-sm text-muted-foreground">Orientações adicionais (opcional)</Label>
+        <Textarea
+          value={additionalInstructions}
+          onChange={(e) => setAdditionalInstructions(e.target.value)}
+          placeholder="Ex: Incluir selo de garantia, adicionar efeito de brilho no fundo..."
+          className="bg-background/50 border-border resize-none"
+          rows={3}
+        />
+      </div>
+    </div>
+  );
 
   if (!selectedBrand) {
     return (
@@ -472,12 +621,23 @@ const CreateCreative = () => {
           <Stepper steps={STEPS} currentStep={step} />
         </div>
 
-        {/* Steps 0–2: wizard */}
-        {step < 3 && (
+        {/* ── Wizard steps ───────────────────────────────────────────────── */}
+        {step < CRIAR_STEP && (
           <div className="gradient-card rounded-2xl p-8 shadow-card border border-border animate-fade-in">
-            {/* Step 0 — Produto */}
+
+            {/* ── Step 0 — Produto (all methods) ── */}
             {step === 0 && (
               <div className="space-y-6">
+                {/* Objective / method badges */}
+                <div className="flex gap-2 flex-wrap">
+                  <Badge variant="outline">
+                    {objective === "engajamento" ? "🤝 Engajamento" : "💰 Venda"}
+                  </Badge>
+                  <Badge variant="outline">
+                    {method === "zero" ? "✨ Do Zero" : method === "ideia" ? "💡 Pela Ideia" : "🔗 Pelo Link"}
+                  </Badge>
+                </div>
+
                 <div>
                   <h2 className="text-xl font-display text-foreground mb-2">Sobre o produto</h2>
                   <p className="text-muted-foreground text-sm">Informações básicas para gerar a copy do anúncio</p>
@@ -487,20 +647,37 @@ const CreateCreative = () => {
                     <Label className="text-sm text-muted-foreground">
                       Nome do produto *<BrandBadge field="productName" />
                     </Label>
-                    <Input value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="Ex: Sérum Vitamina C Premium" className="bg-background/50 border-border" />
+                    <Input
+                      value={productName}
+                      onChange={(e) => setProductName(e.target.value)}
+                      placeholder="Ex: Sérum Vitamina C Premium"
+                      className="bg-background/50 border-border"
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground flex items-center gap-2">
-                      Promessa principal *
-                      {generatingPromise && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
-                          <Sparkles className="w-2.5 h-2.5 animate-pulse" /> gerando...
-                        </span>
-                      )}
-                    </Label>
-                    <Textarea value={promise} onChange={(e) => setPromise(e.target.value)} placeholder="Ex: Pele mais jovem e radiante em 30 dias" className="bg-background/50 border-border resize-none" rows={3} disabled={generatingPromise} />
-                  </div>
+
+                  {/* Promise hidden for link method */}
+                  {method !== "link" && (
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                        Promessa principal *
+                        {generatingPromise && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                            <Sparkles className="w-2.5 h-2.5 animate-pulse" /> gerando...
+                          </span>
+                        )}
+                      </Label>
+                      <Textarea
+                        value={promise}
+                        onChange={(e) => setPromise(e.target.value)}
+                        placeholder="Ex: Pele mais jovem e radiante em 30 dias"
+                        className="bg-background/50 border-border resize-none"
+                        rows={3}
+                        disabled={generatingPromise}
+                      />
+                    </div>
+                  )}
                 </div>
+
                 <div className="space-y-3 pt-2 border-t border-border">
                   <h2 className="text-xl font-display text-foreground pt-2">Quantidade de criativos</h2>
                   <div className="flex gap-3">
@@ -521,6 +698,7 @@ const CreateCreative = () => {
                   </div>
                   <p className="text-xs text-muted-foreground">Cada criativo consome 1 crédito</p>
                 </div>
+
                 <div className="space-y-3 pt-2 border-t border-border">
                   <h2 className="text-xl font-display text-foreground pt-2">
                     Estilo do Criativo<BrandBadge field="creativeStyle" />
@@ -557,8 +735,8 @@ const CreateCreative = () => {
               </div>
             )}
 
-            {/* Step 1 — Persuasão */}
-            {step === 1 && (
+            {/* ── Step 1 — Persuasão (zero) ── */}
+            {step === 1 && method === "zero" && (
               <div className="space-y-6">
                 <div>
                   <h2 className="text-xl font-display text-foreground mb-2">Elementos de persuasão</h2>
@@ -585,50 +763,268 @@ const CreateCreative = () => {
               </div>
             )}
 
-            {/* Step 2 — CTA */}
-            {step === 2 && (
+            {/* ── Step 1 — Ideia (ideia method) ── */}
+            {step === 1 && method === "ideia" && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-xl font-display text-foreground mb-2">Call to Action</h2>
-                  <p className="text-muted-foreground text-sm">Defina o CTA do seu anúncio (opcional)</p>
+                  <h2 className="text-xl font-display text-foreground mb-2">Sua Ideia</h2>
+                  <p className="text-muted-foreground text-sm">Descreva o que você quer criar e a IA vai estruturar para você</p>
                 </div>
-                <CTASelector
-                  value={cta}
-                  onChange={setCta}
-                  placeholder='Ex: "Compre agora com 30% OFF"'
-                />
                 <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Orientações adicionais (opcional)</Label>
+                  <Label className="text-sm text-muted-foreground">Descreva sua ideia *</Label>
                   <Textarea
-                    value={additionalInstructions}
-                    onChange={(e) => setAdditionalInstructions(e.target.value)}
-                    placeholder="Ex: Incluir selo de garantia, adicionar efeito de brilho no fundo..."
+                    value={idea}
+                    onChange={(e) => setIdea(e.target.value)}
+                    placeholder="Ex: Quero criar um post mostrando como meu produto ajuda pessoas ocupadas a economizar tempo no dia a dia..."
                     className="bg-background/50 border-border resize-none"
-                    rows={3}
+                    rows={6}
                   />
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-              <Button variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
-                <ArrowLeft className="w-4 h-4" /> Voltar
-              </Button>
-              {step < 2 ? (
-                <Button variant="hero" onClick={() => setStep(step + 1)} disabled={!canProceed()}>
-                  Próximo <ArrowRight className="w-4 h-4" />
+            {/* ── Step 1 — Link (link method) ── */}
+            {step === 1 && method === "link" && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-display text-foreground mb-2">Link do Produto</h2>
+                  <p className="text-muted-foreground text-sm">A IA vai extrair as informações automaticamente</p>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Cole o link do produto ou conteúdo *</Label>
+                    <Input
+                      type="url"
+                      placeholder="https://..."
+                      value={link}
+                      onChange={(e) => { setLink(e.target.value); setLinkScraped(false); }}
+                      className="bg-background/50 border-border"
+                    />
+                  </div>
+                  {!linkScraped && (
+                    <Button
+                      variant="outline"
+                      onClick={handleScrapeLink}
+                      disabled={isScraping || !link.trim().startsWith("http")}
+                    >
+                      {isScraping
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Analisando link...</>
+                        : "Analisar Link →"}
+                    </Button>
+                  )}
+                  {linkScraped && (
+                    <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 space-y-2">
+                      <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" /> Informações extraídas
+                      </p>
+                      {promise && (
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Promessa:</strong> {promise}
+                        </p>
+                      )}
+                      {pains && (
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Dores:</strong> {pains.split("\n").slice(0, 2).join(", ")}
+                        </p>
+                      )}
+                      {benefits && (
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Benefícios:</strong> {benefits.split("\n").slice(0, 2).join(", ")}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => setLinkScraped(false)}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Analisar outro link
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Step 2 — CTA (zero) ── */}
+            {step === 2 && method === "zero" && ctaStepContent}
+
+            {/* ── Step 2 — Revisar (ideia method) ── */}
+            {step === 2 && method === "ideia" && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-display text-foreground mb-2">Revisar Ideia</h2>
+                  <p className="text-muted-foreground text-sm">A IA estruturou sua ideia — revise antes de continuar</p>
+                </div>
+
+                {formattingIdea && (
+                  <div className="flex flex-col items-center py-12 space-y-4">
+                    <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+                    <p className="text-muted-foreground text-sm">Formatando sua ideia...</p>
+                  </div>
+                )}
+
+                {!formattingIdea && formattedIdea && (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-border bg-background/50 p-5 space-y-4">
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Resumo</p>
+                        <p className="text-sm text-foreground leading-relaxed">{formattedIdea.summary}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Promessa Principal</p>
+                        <p className="text-sm text-foreground">{formattedIdea.promise}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Ângulo Criativo</p>
+                        <p className="text-sm text-foreground">{formattedIdea.angle}</p>
+                      </div>
+                    </div>
+
+                    {/* Review-specific navigation (replaces standard footer) */}
+                    <div className="flex gap-3 pt-2 border-t border-border mt-6">
+                      <Button variant="outline" onClick={() => { setFormattedIdea(null); setStep(1); }}>
+                        <ArrowLeft className="w-4 h-4" /> Editar Ideia
+                      </Button>
+                      <Button variant="hero" onClick={() => setStep(3)}>
+                        Usar esta versão <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Step 3 — CTA (ideia method) ── */}
+            {step === 3 && method === "ideia" && ctaStepContent}
+
+            {/* ── Standard footer navigation (hidden on review step) ── */}
+            {!(method === "ideia" && step === 2) && (
+              <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+                <Button variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
+                  <ArrowLeft className="w-4 h-4" /> Voltar
                 </Button>
-              ) : (
-                <Button variant="hero" onClick={() => { setStep(3); handleGenerate(); }} disabled={!canProceed()}>
-                  Próximo <ArrowRight className="w-4 h-4" />
-                </Button>
+                {step === CRIAR_STEP - 1 ? (
+                  <Button variant="hero" onClick={() => { setStep(CRIAR_STEP); if (method !== "ideia") handleGenerate(); }} disabled={!canProceed()}>
+                    Próximo <ArrowRight className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <Button variant="hero" onClick={() => setStep(step + 1)} disabled={!canProceed()}>
+                    Próximo <ArrowRight className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Criar step ─────────────────────────────────────────────────── */}
+        {step === CRIAR_STEP && method === "ideia" && (
+          <div className="space-y-8 animate-fade-in">
+            {formattedIdea && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-muted-foreground">Copy gerada a partir da sua ideia</p>
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Ângulo</p>
+                  <p className="font-medium">{formattedIdea.angle}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mt-2">Resumo</p>
+                  <p className="text-sm text-muted-foreground">{formattedIdea.summary}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-4 flex-wrap">
+                {images.length < 3 && (
+                  <button
+                    type="button"
+                    onClick={openAddDialog}
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-2.5 py-1.5 rounded-lg border border-border/60 hover:border-primary/40 bg-background/40"
+                  >
+                    <Images className="w-3.5 h-3.5" />
+                    Adicionar Imagem
+                  </button>
+                )}
+                {selectedBrand?.logo_url && (
+                  <div className="inline-flex items-center gap-2">
+                    <Label htmlFor="logo-toggle-ideia" className="text-xs text-muted-foreground cursor-pointer">
+                      Enviar Logo
+                    </Label>
+                    <Switch id="logo-toggle-ideia" checked={includeLogo} onCheckedChange={setIncludeLogo} />
+                  </div>
+                )}
+              </div>
+              {images.length > 0 && (
+                <div className="flex gap-3 flex-wrap">
+                  {images.map((file, idx) => (
+                    <div key={idx} className="relative group w-20 h-20 shrink-0">
+                      <img src={imagePreviews[idx]} alt={file.name} className="w-full h-full rounded-xl object-cover" />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 rounded-xl transition-opacity flex items-center justify-center gap-2">
+                        <button type="button" onClick={() => openEditDialog(idx)} className="p-1 rounded-md bg-white/20 hover:bg-white/30 transition-colors">
+                          <Pencil className="w-3.5 h-3.5 text-white" />
+                        </button>
+                        <button type="button" onClick={() => removeImage(idx)} className="p-1 rounded-md bg-white/20 hover:bg-white/30 transition-colors">
+                          <X className="w-3.5 h-3.5 text-white" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-base font-display text-foreground">Formato do Criativo</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { value: "1:1", label: "1:1", desc: "Feed" },
+                  { value: "4:5", label: "4:5", desc: "Feed vertical" },
+                  { value: "9:16", label: "9:16", desc: "Stories/Reels" },
+                  { value: "16:9", label: "16:9", desc: "Landscape" },
+                ].map((f) => (
+                  <div
+                    key={f.value}
+                    className={`rounded-xl p-4 border-2 cursor-pointer transition-all text-center ${
+                      format === f.value
+                        ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                        : "border-border hover:border-primary/40 bg-background/50"
+                    }`}
+                    onClick={() => setFormat(f.value)}
+                  >
+                    <span className="font-display text-foreground">{f.label}</span>
+                    <p className="text-xs text-muted-foreground mt-1">{f.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Dialog open={generatingCreative} onOpenChange={() => {}}>
+              <DialogContent className="sm:max-w-sm [&>button]:hidden" onInteractOutside={(e) => e.preventDefault()}>
+                <DialogHeader>
+                  <DialogTitle className="text-center font-normal">Gerando seu criativo...</DialogTitle>
+                </DialogHeader>
+                <GenerationProgress
+                  isActive={generatingCreative}
+                  type="creative"
+                  onTimeout={() => {
+                    toast({ title: "Geração demorada", description: "O processo está demorando mais que o esperado. Se persistir, tente novamente.", variant: "destructive" });
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+
+            <div className="flex gap-4 justify-center pt-4">
+              <Button variant="outline" onClick={resetWizard}>Novo Criativo</Button>
+              <Button
+                variant="hero"
+                onClick={handleGenerateCreative}
+                disabled={!formattedIdea || generatingCreative}
+              >
+                {generatingCreative ? "Gerando criativo..." : <><Sparkles className="w-4 h-4" /> Gerar Criativo</>}
+              </Button>
             </div>
           </div>
         )}
 
-        {/* Step 3 — Criar */}
-        {step === 3 && (
+        {step === CRIAR_STEP && method !== "ideia" && (
           loading ? (
             <div className="flex flex-col items-center justify-center py-32 space-y-6 animate-fade-in">
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -646,120 +1042,92 @@ const CreateCreative = () => {
                 <p className="text-muted-foreground text-sm">Selecione a copy que melhor representa seu anúncio</p>
               </div>
 
-              {/* Angle cards */}
               <div className="space-y-4">
                 {generatedAngles
                   .filter((_, idx) => selectedAngle === null || selectedAngle === idx)
                   .map((angle, _unused, arr) => {
-                  const angleIdx = generatedAngles.indexOf(angle);
-                  const isSelected = selectedAngle === angleIdx;
-                  return (
-                    <div
-                      key={angleIdx}
-                      className={`gradient-card rounded-2xl p-6 shadow-card transition-all duration-200 ${
-                        isSelected ? "ring-2 ring-primary/30" : "cursor-pointer hover:ring-1 hover:ring-primary/20"
-                      }`}
-                      onClick={() => !isSelected && setSelectedAngle(angleIdx)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-primary uppercase tracking-wider">
-                              {angleLabels[angleIdx] || angle.angle_name}
-                            </span>
-                          </div>
-                          <h3 className="text-xl font-display text-foreground">{angle.headline}</h3>
-                          {angle.subheadline && (
-                            <p className="text-sm text-muted-foreground font-medium">{angle.subheadline}</p>
-                          )}
-                          <p className="text-sm text-foreground/80">{angle.body}</p>
-                          <div className="pt-2">
-                            <span className="inline-block px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold">
-                              {angle.cta}
-                            </span>
-                          </div>
-
-                          {/* Image + logo controls inside selected card */}
-                          {isSelected && (
-                            <div
-                              className="pt-3 mt-1 border-t border-border/50 space-y-3 animate-fade-in"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div className="flex items-center gap-4 flex-wrap">
-                                {images.length < 3 && (
-                                  <button
-                                    type="button"
-                                    onClick={openAddDialog}
-                                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-2.5 py-1.5 rounded-lg border border-border/60 hover:border-primary/40 bg-background/40"
-                                  >
-                                    <Images className="w-3.5 h-3.5" />
-                                    Adicionar Imagem
-                                  </button>
-                                )}
-
-                                {selectedBrand?.logo_url && (
-                                  <div
-                                    className="inline-flex items-center gap-2"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <Label htmlFor="logo-toggle" className="text-xs text-muted-foreground cursor-pointer">
-                                      Enviar Logo
-                                    </Label>
-                                    <Switch
-                                      id="logo-toggle"
-                                      checked={includeLogo}
-                                      onCheckedChange={setIncludeLogo}
-                                    />
-                                  </div>
-                                )}
-                              </div>
+                    const angleIdx = generatedAngles.indexOf(angle);
+                    const isSelected = selectedAngle === angleIdx;
+                    return (
+                      <div
+                        key={angleIdx}
+                        className={`gradient-card rounded-2xl p-6 shadow-card transition-all duration-200 ${
+                          isSelected ? "ring-2 ring-primary/30" : "cursor-pointer hover:ring-1 hover:ring-primary/20"
+                        }`}
+                        onClick={() => !isSelected && setSelectedAngle(angleIdx)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-2 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                                {angleLabels[angleIdx] || angle.angle_name}
+                              </span>
                             </div>
+                            <h3 className="text-xl font-display text-foreground">{angle.headline}</h3>
+                            {angle.subheadline && (
+                              <p className="text-sm text-muted-foreground font-medium">{angle.subheadline}</p>
+                            )}
+                            <p className="text-sm text-foreground/80">{angle.body}</p>
+                            <div className="pt-2">
+                              <span className="inline-block px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-semibold">
+                                {angle.cta}
+                              </span>
+                            </div>
+
+                            {isSelected && (
+                              <div
+                                className="pt-3 mt-1 border-t border-border/50 space-y-3 animate-fade-in"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="flex items-center gap-4 flex-wrap">
+                                  {images.length < 3 && (
+                                    <button
+                                      type="button"
+                                      onClick={openAddDialog}
+                                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-2.5 py-1.5 rounded-lg border border-border/60 hover:border-primary/40 bg-background/40"
+                                    >
+                                      <Images className="w-3.5 h-3.5" />
+                                      Adicionar Imagem
+                                    </button>
+                                  )}
+                                  {selectedBrand?.logo_url && (
+                                    <div className="inline-flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <Label htmlFor="logo-toggle" className="text-xs text-muted-foreground cursor-pointer">
+                                        Enviar Logo
+                                      </Label>
+                                      <Switch id="logo-toggle" checked={includeLogo} onCheckedChange={setIncludeLogo} />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {isSelected && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setSelectedAngle(null); setImages([]); setImageInstructions([]); }}
+                              className="inline-flex items-center gap-1 text-xs text-red-400/80 hover:text-red-500 bg-red-50/60 hover:bg-red-50 dark:bg-red-950/20 dark:hover:bg-red-950/40 px-2.5 py-1.5 rounded-lg transition-colors shrink-0 ml-4 mt-0.5"
+                            >
+                              <X className="w-3 h-3" />
+                              Trocar ângulo
+                            </button>
                           )}
                         </div>
-                        {isSelected && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedAngle(null);
-                              setImages([]);
-                              setImageInstructions([]);
-                            }}
-                            className="inline-flex items-center gap-1 text-xs text-red-400/80 hover:text-red-500 bg-red-50/60 hover:bg-red-50 dark:bg-red-950/20 dark:hover:bg-red-950/40 px-2.5 py-1.5 rounded-lg transition-colors shrink-0 ml-4 mt-0.5"
-                          >
-                            <X className="w-3 h-3" />
-                            Trocar ângulo
-                          </button>
-                        )}
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
 
-              {/* Image thumbnails */}
               {selectedAngle !== null && (images.length > 0 || (includeLogo && !!selectedBrand?.logo_url)) && (
                 <div className="flex gap-3 flex-wrap animate-fade-in">
                   {images.map((file, idx) => (
                     <div key={idx} className="relative group w-20 h-20 shrink-0">
-                      <img
-                        src={imagePreviews[idx]}
-                        alt={file.name}
-                        className="w-full h-full rounded-xl object-cover"
-                      />
+                      <img src={imagePreviews[idx]} alt={file.name} className="w-full h-full rounded-xl object-cover" />
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 rounded-xl transition-opacity flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditDialog(idx)}
-                          className="p-1 rounded-md bg-white/20 hover:bg-white/30 transition-colors"
-                        >
+                        <button type="button" onClick={() => openEditDialog(idx)} className="p-1 rounded-md bg-white/20 hover:bg-white/30 transition-colors">
                           <Pencil className="w-3.5 h-3.5 text-white" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => removeImage(idx)}
-                          className="p-1 rounded-md bg-white/20 hover:bg-white/30 transition-colors"
-                        >
+                        <button type="button" onClick={() => removeImage(idx)} className="p-1 rounded-md bg-white/20 hover:bg-white/30 transition-colors">
                           <X className="w-3.5 h-3.5 text-white" />
                         </button>
                       </div>
@@ -768,7 +1136,6 @@ const CreateCreative = () => {
                 </div>
               )}
 
-              {/* Format selector */}
               {selectedAngle !== null && (
                 <div className="space-y-5 animate-fade-in">
                   <div className="space-y-3">
@@ -801,7 +1168,7 @@ const CreateCreative = () => {
               <Dialog open={generatingCreative} onOpenChange={() => {}}>
                 <DialogContent className="sm:max-w-sm [&>button]:hidden" onInteractOutside={(e) => e.preventDefault()}>
                   <DialogHeader>
-                    <DialogTitle className="text-center">Gerando seu criativo...</DialogTitle>
+                    <DialogTitle className="text-center font-normal">Gerando seu criativo...</DialogTitle>
                   </DialogHeader>
                   <GenerationProgress
                     isActive={generatingCreative}
@@ -814,9 +1181,7 @@ const CreateCreative = () => {
               </Dialog>
 
               <div className="flex gap-4 justify-center pt-4">
-                <Button variant="outline" onClick={resetWizard}>
-                  Novo Criativo
-                </Button>
+                <Button variant="outline" onClick={resetWizard}>Novo Criativo</Button>
                 <Button
                   variant="hero"
                   onClick={handleGenerateCreative}
@@ -830,12 +1195,11 @@ const CreateCreative = () => {
         )}
       </div>
 
+      {/* ── Image dialog ─────────────────────────────────────────────────── */}
       <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editingImageIdx !== null ? "Editar imagem" : "Adicionar imagem"}
-            </DialogTitle>
+            <DialogTitle>{editingImageIdx !== null ? "Editar imagem" : "Adicionar imagem"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <ImageUpload images={dialogImage} onImagesChange={setDialogImage} maxImages={1} />

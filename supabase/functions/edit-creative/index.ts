@@ -44,6 +44,7 @@ serve(async (req) => {
       edit_element,
       user_message,
       brand_id,
+      format,
     } = await req.json();
 
     if (!original_creative_id || !source_image_url || !user_message) {
@@ -91,11 +92,19 @@ serve(async (req) => {
       : "";
     const translatedPrompt = `${elementContext}Instrução de edição: ${user_message}. Mantenha todos os demais elementos visuais inalterados. Preservar identidade visual, paleta de cores e composição geral do criativo original.`;
 
+    const FORMAT_TO_IMAGE_SIZE: Record<string, string> = {
+      "1:1":  "square_hd",
+      "4:5":  "portrait_4_3",
+      "9:16": "portrait_16_9",
+      "16:9": "landscape_16_9",
+    };
+    const imageSize = FORMAT_TO_IMAGE_SIZE[format ?? "1:1"] ?? "square_hd";
+
     // Chamar fal.ai — mesmo padrão do generate-creative
     const falPayload = {
       prompt:        translatedPrompt,
       image_urls:    [source_image_url],
-      image_size:    "square_hd",
+      image_size:    imageSize,
       quality:       "medium",
       num_images:    1,
       output_format: "png",

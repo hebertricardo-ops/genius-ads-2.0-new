@@ -312,11 +312,12 @@ const CreativeEditor = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!creativeId && !!user && !stateImageUrl,
+    enabled: !!creativeId && !!user,
   });
 
   const imageUrl: string = stateImageUrl ?? creative?.image_url ?? "";
   const brandId: string | null = stateBrandId ?? (creative as any)?.brand_id ?? null;
+  const creativeFormat: string = (creative as any)?.copy_data?.format ?? "1:1";
 
   const {
     messages,
@@ -386,6 +387,7 @@ const CreativeEditor = () => {
       editElement: selectedElement,
       originalCreativeId: creativeId,
       brandId,
+      format: creativeFormat,
     });
   };
 
