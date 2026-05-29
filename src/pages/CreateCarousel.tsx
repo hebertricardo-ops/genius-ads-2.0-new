@@ -20,7 +20,7 @@ import ImageUpload from "@/components/ImageUpload";
 import CreditsBadge from "@/components/CreditsBadge";
 import {
   ArrowLeft, ArrowRight, Sparkles, Check, RefreshCw, Images,
-  Building2, Loader2, Download, Library, CheckCircle2,
+  Building2, Loader2, Download, Library, CheckCircle2, MessageSquare,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +50,7 @@ interface CarouselCopy {
   credits_cost: number;
   objective: string;
   slides: CarouselSlide[];
+  ad_caption: string;
 }
 
 interface SlideState {
@@ -128,6 +129,7 @@ const CreateCarousel = () => {
   // Phase states
   const [loadingCopy, setLoadingCopy] = useState(false);
   const [generatedCopy, setGeneratedCopy] = useState<CarouselCopy | null>(null);
+  const [editedCaption, setEditedCaption] = useState("");
   const [slideStates, setSlideStates] = useState<SlideState[]>([]);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
@@ -475,12 +477,18 @@ const CreateCarousel = () => {
 
       const imageUrl = data.image_url;
 
+      const caption = editedCaption || generatedCopy?.ad_caption || "";
       await supabase.from("generated_creatives").insert({
         user_id: user.id,
         image_url: imageUrl,
         carousel_request_id: requestId,
         brand_id: selectedBrand?.id ?? null,
-        copy_data: { type: "carousel", slide_number: slide.slide_number, ...slide },
+        copy_data: {
+          type: "carousel",
+          slide_number: slide.slide_number,
+          ...slide,
+          ...(slide.slide_number === 1 ? { carousel_caption: caption } : {}),
+        },
         credits_used: CREDITS_PER_SLIDE,
       });
 
@@ -625,12 +633,18 @@ const CreateCarousel = () => {
         const imageUrl: string = data.image_url;
 
         setGenStatusMessage(`Slide ${slideNum} — salvando...`);
+        const caption = editedCaption || generatedCopy?.ad_caption || "";
         await supabase.from("generated_creatives").insert({
           user_id: user.id,
           image_url: imageUrl,
           carousel_request_id: requestId,
           brand_id: selectedBrand?.id ?? null,
-          copy_data: { type: "carousel", slide_number: slide.slide_number, ...slide },
+          copy_data: {
+            type: "carousel",
+            slide_number: slide.slide_number,
+            ...slide,
+            ...(slide.slide_number === 1 ? { carousel_caption: caption } : {}),
+          },
           credits_used: CREDITS_PER_SLIDE,
         });
 
@@ -1184,6 +1198,25 @@ const CreateCarousel = () => {
                   );
                 })}
               </div>
+
+              {/* Legenda do post */}
+              {generatedCopy.ad_caption && (
+                <div className="space-y-2 p-4 rounded-xl border border-border gradient-card">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium text-foreground">Legenda do post</span>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {(editedCaption || generatedCopy.ad_caption).length}/280
+                    </span>
+                  </div>
+                  <Textarea
+                    value={editedCaption || generatedCopy.ad_caption}
+                    onChange={(e) => setEditedCaption(e.target.value)}
+                    rows={4}
+                    className="text-sm resize-none"
+                  />
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-border">
                 <Button

@@ -359,7 +359,7 @@ Informações adicionais: ${extra_context || "Nenhuma"}
 
 REGRA DE CTA — INSTRUÇÃO CRÍTICA: O CTA base fornecido pelo usuário é INTOCÁVEL e deve aparecer LITERALMENTE no CTA do slide final. PROIBIDO substituir, parafrasear ou omitir qualquer palavra do CTA base. Formato obrigatório: [CTA BASE EXATO] + [complemento opcional com gatilho de urgência ou curiosidade]. EXEMPLO CORRETO (CTA base: "Clique em Saiba Mais"): ✅ "Clique em Saiba Mais e transforme sua criação de anúncios hoje" ✅ "Clique em Saiba Mais — seu próximo criativo leva 60 segundos" ✅ "Clique em Saiba Mais agora". EXEMPLO ERRADO — TERMINANTEMENTE PROIBIDO: ❌ "Clique e mude sua forma de fazer anúncios agora" ❌ "Descubra como criar anúncios em 60 segundos" ❌ Qualquer CTA que não comece com as palavras exatas do CTA base.
 
-REGRA DE LEGENDAS: Além da copy dos slides, gere também 3 opções de legenda para a postagem do carrossel. Cada legenda deve seguir a estrutura: 1) Gancho forte (primeira linha que prende atenção), 2) Desenvolvimento persuasivo (2-3 frases curtas), 3) CTA final. As legendas devem ser variadas em tom e abordagem, baseadas nas informações do produto. Máximo de 280 caracteres por legenda.
+REGRA DE LEGENDAS: Gere 1 legenda para a postagem do carrossel. Estrutura: 1) Gancho forte (primeira linha que prende atenção), 2) Desenvolvimento persuasivo (2-3 frases curtas), 3) CTA final. Máximo 280 caracteres.
 
 Agora gere a copy completa do carrossel.
 
@@ -408,19 +408,12 @@ LEMBRETE CRÍTICO — INSTRUÇÃO INVIOLÁVEL: O CTA do slide final DEVE começa
                   description: "Array de slides do carrossel",
                   items: slideSchema,
                 },
-                ad_captions: {
-                  type: "array",
-                  description: "3 opções de legenda para a postagem do carrossel",
-                  items: {
-                    type: "object",
-                    properties: {
-                      caption: { type: "string", description: "Legenda completa pronta para uso" },
-                    },
-                    required: ["caption"],
-                  },
+                ad_caption: {
+                  type: "string",
+                  description: "Legenda única para a postagem do carrossel. Estrutura: gancho + desenvolvimento persuasivo + CTA. Máximo 280 caracteres.",
                 },
               },
-              required: ["carousel_title", "slides_count", "credits_cost", "objective", "slides", "ad_captions"],
+              required: ["carousel_title", "slides_count", "credits_cost", "objective", "slides", "ad_caption"],
             },
           },
         },

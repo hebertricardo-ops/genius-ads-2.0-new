@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import {
   Image, Download, Clock, Loader2, RefreshCw, Layers,
   Copy, Trash2, ChevronLeft, ChevronRight, Check,
-  MessageSquare, LayoutGrid, Sparkles, Smile, MoreHorizontal, Send, Pencil, CalendarDays,
+  MessageSquare, LayoutGrid, Maximize2, Sparkles, Smile, MoreHorizontal, Send, Pencil, CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSocialPublish } from "@/hooks/useSocialPublish";
@@ -290,8 +291,14 @@ const History = () => {
   };
 
   // ── Carousel caption helpers ──
+  const _carouselReqData = selectedCarousel
+    ? (carouselRequestsMap[selectedCarousel.requestId] as any)?.result_data
+    : null;
   const carouselOriginalCaption: string =
-    (selectedCarousel?.slides[0]?.copy_data as any)?.carousel_caption ?? "";
+    (selectedCarousel?.slides[0]?.copy_data as any)?.carousel_caption
+    ?? _carouselReqData?.ad_caption
+    ?? _carouselReqData?.ad_captions?.[0]?.caption
+    ?? "";
   const carouselCaptionValue =
     carouselEditedCaption !== null ? carouselEditedCaption : carouselOriginalCaption;
   const carouselCaptionChanged =
@@ -310,15 +317,43 @@ const History = () => {
     setCarouselCaptionSaving(true);
     try {
       const firstSlide = selectedCarousel.slides[0];
-      const copyData = (firstSlide?.copy_data as any) || {};
-      await (supabase as any)
+      if (!firstSlide?.id) throw new Error("Slide não encontrado");
+      const copyData = (firstSlide.copy_data as any) || {};
+      const { error } = await (supabase as any)
         .from("generated_creatives")
         .update({ copy_data: { ...copyData, carousel_caption: carouselEditedCaption } })
         .eq("id", firstSlide.id);
+      if (error) throw new Error(error.message);
+
+      const savedCaption = carouselEditedCaption;
+
+      // Atualiza selectedCarousel em memória
+      setSelectedCarousel(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          slides: prev.slides.map((s, i) =>
+            i === 0
+              ? { ...s, copy_data: { ...((s.copy_data as any) || {}), carousel_caption: savedCaption } }
+              : s
+          ),
+        };
+      });
+
+      // Atualiza o cache do React Query diretamente para persistir após fechar/reabrir
+      queryClient.setQueryData(
+        ["gallery-creatives", user?.id, selectedBrand?.id],
+        (old: CreativeItem[] = []) =>
+          old.map(c =>
+            c.id === firstSlide.id
+              ? { ...c, copy_data: { ...((c.copy_data as any) || {}), carousel_caption: savedCaption } }
+              : c
+          ),
+      );
+
       setCarouselEditedCaption(null);
       setCarouselCaptionSaved(true);
       setTimeout(() => setCarouselCaptionSaved(false), 2000);
-      queryClient.invalidateQueries({ queryKey: ["gallery-creatives"] });
     } catch (e: any) {
       toast({ title: "Erro ao salvar legenda", description: e.message, variant: "destructive" });
     } finally {
@@ -523,6 +558,15 @@ const History = () => {
     } finally {
       setAdaptingFormat(false);
     }
+  };
+
+  const handleDownloadCarouselZip = () => {
+    if (!selectedCarousel) return;
+    selectedCarousel.slides.forEach((slide, i) => {
+      setTimeout(() => {
+        handleDownload(slide.image_url, `slide-${i + 1}-${selectedCarousel.requestId.slice(0, 6)}.png`);
+      }, i * 400);
+    });
   };
 
   const handleDownload = async (url: string, filename: string) => {
@@ -924,48 +968,33 @@ const History = () => {
                     >
                       <CalendarDays className="w-3 h-3" /> Agendar Postagem
                     </Button>
-                    {info?.type === "creative" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-xs px-2.5 h-8"
-                        onClick={() => navigate(`/editor/${selectedCreative.id}`, {
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="text-xs px-2 h-8 ml-auto">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => navigate(`/editor/${selectedCreative.id}`, {
                           state: { imageUrl: selectedCreative.image_url, brandId: selectedCreative.brand_id },
-                        })}
-                      >
-                        <Pencil className="w-3 h-3" /> Editar IA
-                      </Button>
-                    )}
-                    {info?.type === "creative" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-xs px-2.5 h-8"
-                        onClick={() => { setAdaptFormat("1:1"); setAdaptFormatOpen(true); }}
-                      >
-                        <LayoutGrid className="w-3 h-3" /> Adaptar Formato
-                      </Button>
-                    )}
-                    {info && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="text-xs px-2 h-8 ml-auto">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleRegenerate(selectedCreative)}>
-                            <RefreshCw className="w-3.5 h-3.5 mr-2" /> Regenerar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => confirmDelete(selectedCreative)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5 mr-2" /> Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
+                        })}>
+                          <Pencil className="w-3.5 h-3.5 mr-2" /> Editar com IA
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setAdaptFormat("1:1"); setAdaptFormatOpen(true); }}>
+                          <Maximize2 className="w-3.5 h-3.5 mr-2" /> Adaptar Formato
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleRegenerate(selectedCreative)}>
+                          <RefreshCw className="w-3.5 h-3.5 mr-2" /> Regenerar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => confirmDelete(selectedCreative)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-2" /> Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </div>
@@ -1137,6 +1166,14 @@ const History = () => {
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
+                    className="text-xs px-2.5 h-8"
+                    onClick={handleDownloadCarouselZip}
+                  >
+                    <Download className="w-3 h-3" /> Baixar ZIP
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="hero"
                     className="text-xs px-2.5 h-8"
                     onClick={() => {
@@ -1154,6 +1191,29 @@ const History = () => {
                   >
                     <Send className="w-3 h-3" /> Postar
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs px-2.5 h-8"
+                    onClick={() => {
+                      const cover = selectedCarousel.slides[0];
+                      const carouselReq = carouselRequestsMap[selectedCarousel.requestId];
+                      navigate("/calendario", {
+                        state: {
+                          scheduleCreative: {
+                            id: cover?.id,
+                            image_url: cover?.image_url ?? "",
+                            image_urls: selectedCarousel.slides.map((s) => s.image_url).filter(Boolean),
+                            caption: carouselCaptionValue,
+                            brand_id: cover?.brand_id,
+                            title: carouselReq?.product_name ?? "Carrossel",
+                          },
+                        },
+                      });
+                    }}
+                  >
+                    <CalendarDays className="w-3 h-3" /> Agendar Postagem
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="text-xs px-2 h-8 ml-auto">
@@ -1161,6 +1221,18 @@ const History = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => {
+                        const firstSlide = selectedCarousel.slides[0];
+                        if (firstSlide) navigate(`/editor/${firstSlide.id}`, {
+                          state: { imageUrl: firstSlide.image_url, brandId: firstSlide.brand_id },
+                        });
+                      }}>
+                        <Pencil className="w-3.5 h-3.5 mr-2" /> Editar com IA
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setAdaptFormat("1:1"); setAdaptFormatOpen(true); }}>
+                        <Maximize2 className="w-3.5 h-3.5 mr-2" /> Adaptar Formato
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       {selectedCarousel.slides[0] && (
                         <DropdownMenuItem onClick={() => handleRegenerate(selectedCarousel.slides[0])}>
                           <RefreshCw className="w-3.5 h-3.5 mr-2" /> Regenerar
