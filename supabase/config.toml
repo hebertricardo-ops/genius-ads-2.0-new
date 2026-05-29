@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.update-hotmart-user]
 verify_jwt = false
+
+[functions.cancel-hotmart-user]
+verify_jwt = false
