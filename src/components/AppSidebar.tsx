@@ -42,8 +42,9 @@ import UpgradeDialog from "@/components/UpgradeDialog";
 
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
+  const closeMobileIfNeeded = () => { if (isMobile) setOpenMobile(false); };
   const [createOpen, setCreateOpen] = useState(false);
   const [noBrandOpen, setNoBrandOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -201,6 +202,7 @@ export function AppSidebar() {
                   <NavLink
                     to="/dashboard"
                     end
+                    onClick={closeMobileIfNeeded}
                     className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
                     activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                   >
@@ -213,7 +215,7 @@ export function AppSidebar() {
               {/* Criar */}
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => selectedBrand ? setCreateOpen(true) : setNoBrandOpen(true)}
+                  onClick={() => { closeMobileIfNeeded(); selectedBrand ? setCreateOpen(true) : setNoBrandOpen(true); }}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer",
                     "text-white bg-primary border border-primary hover:bg-primary/90 hover:shadow-sm",
@@ -231,6 +233,7 @@ export function AppSidebar() {
                   <NavLink
                     to="/history"
                     end
+                    onClick={closeMobileIfNeeded}
                     className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
                     activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                   >
@@ -246,6 +249,7 @@ export function AppSidebar() {
                   <NavLink
                     to="/calendario"
                     end
+                    onClick={closeMobileIfNeeded}
                     className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
                     activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                   >
@@ -270,6 +274,7 @@ export function AppSidebar() {
                   <NavLink
                     to="/social-accounts"
                     end
+                    onClick={closeMobileIfNeeded}
                     className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
                     activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                   >
@@ -302,6 +307,7 @@ export function AppSidebar() {
                   <NavLink
                     to="/analytics"
                     end
+                    onClick={closeMobileIfNeeded}
                     className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
                     activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                   >
@@ -331,6 +337,7 @@ export function AppSidebar() {
                     <NavLink
                       to="/add-credits"
                       end
+                      onClick={closeMobileIfNeeded}
                       className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
                       activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                     >
@@ -347,6 +354,7 @@ export function AppSidebar() {
                   <NavLink
                     to="/support"
                     end
+                    onClick={closeMobileIfNeeded}
                     className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
                     activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                   >

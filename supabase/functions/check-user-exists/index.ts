@@ -13,8 +13,9 @@ serve(async (req) => {
   }
 
   try {
-    const webhookSecret = req.headers.get("x-webhook-secret");
     const expectedSecret = Deno.env.get("WEBHOOK_SECRET");
+    const webhookSecret = req.headers.get("x-webhook-secret")
+      ?? req.headers.get("authorization")?.replace("Bearer ", "");
     if (!expectedSecret || webhookSecret !== expectedSecret) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -71,16 +72,16 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           exists: true,
-          userId: user.id,
+          user_id: user.id,
           email,
-          creditsBalance: credits?.credits_balance ?? 0,
+          credits_balance: credits?.credits_balance ?? 0,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
       );
     }
 
     return new Response(
-      JSON.stringify({ exists: false, email }),
+      JSON.stringify({ exists: false }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
