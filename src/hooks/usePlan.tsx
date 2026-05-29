@@ -9,6 +9,7 @@ export interface PlanFeatures {
   isActive: boolean;
   hasCalendar: boolean;
   hasSocialMedia: boolean;
+  hasAnalytics: boolean;
   maxBrands: number | null;
   maxSocialProfiles: number;
   monthlyCredits: number;
@@ -22,6 +23,7 @@ const FREE_PLAN: Omit<PlanFeatures, "isLoading"> = {
   isActive: false,
   hasCalendar: false,
   hasSocialMedia: false,
+  hasAnalytics: false,
   maxBrands: 1,
   maxSocialProfiles: 0,
   monthlyCredits: 0,
@@ -46,6 +48,7 @@ export const usePlan = (): PlanFeatures => {
             max_brands,
             has_calendar,
             has_social_media,
+            has_analytics,
             max_social_profiles
           )
         `)
@@ -70,6 +73,7 @@ export const usePlan = (): PlanFeatures => {
     isActive: data.status === "active",
     hasCalendar: plan.has_calendar ?? false,
     hasSocialMedia: plan.has_social_media ?? false,
+    hasAnalytics: plan.has_analytics ?? false,
     maxBrands: plan.max_brands ?? null,
     maxSocialProfiles: plan.max_social_profiles ?? 0,
     monthlyCredits: plan.monthly_credits ?? 0,

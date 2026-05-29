@@ -2,9 +2,9 @@ import type { ElementType } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Share2, Building2, Users, ArrowRight } from "lucide-react";
+import { CalendarDays, Share2, Building2, Users, ArrowRight, BarChart2 } from "lucide-react";
 
-type UpgradeFeature = "calendar" | "social_media" | "brands" | "social_profiles";
+type UpgradeFeature = "calendar" | "social_media" | "brands" | "social_profiles" | "analytics";
 
 interface UpgradeDialogProps {
   open: boolean;
@@ -35,6 +35,11 @@ const FEATURE_INFO: Record<UpgradeFeature, { icon: ElementType; title: string; d
     icon: Users,
     title: "Limite de Perfis Sociais",
     description: "Você atingiu o limite de perfis sociais conectados.",
+  },
+  analytics: {
+    icon: BarChart2,
+    title: "Painel de Analytics",
+    description: "Acesse dados de alcance, impressões e engajamento das suas redes sociais.",
   },
 };
 

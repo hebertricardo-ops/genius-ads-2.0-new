@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, Plus, Images, Coins, CalendarDays, Smartphone,
   UserCircle, CreditCard, HeadphonesIcon, LogOut, Sun, Moon, Monitor, ChevronUp,
-  Tag, ChevronDown, Check, AlertCircle, Settings, Lock,
+  Tag, ChevronDown, Check, AlertCircle, Settings, Lock, BarChart2,
 } from "lucide-react";
 import { useSocialPublish } from "@/hooks/useSocialPublish";
 import { usePlan } from "@/hooks/usePlan";
@@ -69,7 +69,7 @@ export function AppSidebar() {
     ? supabase.storage.from("creative-uploads").getPublicUrl(`${user.id}/avatar.png`).data.publicUrl
     : null;
 
-  const { hasSubscription, hasCalendar, hasSocialMedia, maxBrands, planName } = usePlan();
+  const { hasSubscription, hasCalendar, hasSocialMedia, hasAnalytics, maxBrands, planName } = usePlan();
   const freeLimit = 1;
   const effectiveBrandLimit = hasSubscription ? maxBrands : freeLimit;
   const isBrandAtLimit = effectiveBrandLimit !== null && brands.length >= effectiveBrandLimit;
@@ -282,12 +282,40 @@ export function AppSidebar() {
                             <Lock className="w-2.5 h-2.5" />Advanced+
                           </span>
                         ) : socialConnected ? (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-500/15 text-green-500 border border-green-500/25">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-green-500/15 text-green-500">
                             Ativo
                           </span>
                         ) : (
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/25">
                             Conectar
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* Analytics */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/analytics"
+                    end
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                    activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                  >
+                    <BarChart2 className="h-4 w-4 shrink-0" />
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1">Analytics</span>
+                        {hasAnalytics ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100 text-amber-700">
+                            Beta
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground border border-border">
+                            <Lock className="w-2.5 h-2.5" />Advanced+
                           </span>
                         )}
                       </>
