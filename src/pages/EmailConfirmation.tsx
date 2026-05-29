@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,12 @@ const EmailConfirmation = () => {
   const email = (location.state as { email?: string })?.email ?? "";
   const [resending, setResending] = useState(false);
   const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).fbq) {
+      (window as any).fbq("trackCustom", "CadastroRealizado");
+    }
+  }, []);
 
   const handleResend = async () => {
     if (!email) return;
