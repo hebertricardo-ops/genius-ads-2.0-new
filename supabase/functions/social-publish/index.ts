@@ -109,7 +109,8 @@ serve(async (req) => {
 
     if (!publishRes.ok) {
       const errText = await publishRes.text();
-      throw new Error(`Upload-Post publish error (${publishRes.status}): ${errText}`);
+      console.error(`social-publish: Upload-Post error ${publishRes.status} | photos=${photos.length} | is_carousel=${is_carousel} | caption_len=${caption?.length} | body=${errText}`);
+      throw new Error(`Erro ao publicar via Upload-Post (${publishRes.status}): ${errText}`);
     }
 
     const publishData = await publishRes.json();

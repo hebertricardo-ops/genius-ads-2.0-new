@@ -457,7 +457,14 @@ const History = () => {
           scheduled_for: null,
         },
       });
-      if (error) throw new Error(error.message);
+      if (error) {
+        let msg = error.message;
+        try {
+          const body = await (error as any).context?.json?.();
+          if (body?.error) msg = body.error;
+        } catch { /* usa msg genérica */ }
+        throw new Error(msg);
+      }
       if (data?.error) throw new Error(data.error);
       toast({ title: "Post enviado para publicação!" });
       setPostDialogOpen(false);

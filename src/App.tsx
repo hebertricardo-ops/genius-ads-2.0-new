@@ -23,6 +23,7 @@ import AddCredits from "./pages/AddCredits";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import EmailConfirmation from "./pages/EmailConfirmation";
+import Welcome from "./pages/Welcome";
 import AuthCallback from "./pages/AuthCallback";
 import BrandSetup from "./pages/BrandSetup";
 import BrandsManager from "./pages/BrandsManager";
@@ -63,6 +64,7 @@ const App = () => (
             <Route path="/terms-of-use" element={<TermsOfUse />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/email-confirmation" element={<EmailConfirmation />} />
+            <Route path="/welcome" element={<Welcome />} />
             <Route path="/dashboard" element={<ProtectedWithLayout><Dashboard /></ProtectedWithLayout>} />
             <Route path="/create" element={<ProtectedWithLayout><CreateCreative /></ProtectedWithLayout>} />
             <Route path="/create-carousel" element={<ProtectedWithLayout><CreateCarousel /></ProtectedWithLayout>} />

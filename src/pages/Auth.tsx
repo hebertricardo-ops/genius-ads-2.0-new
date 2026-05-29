@@ -100,7 +100,7 @@ const Auth = () => {
             body: JSON.stringify({ name, email, whatsapp: rawWhatsapp }),
           }).catch(() => {});
 
-          navigate("/email-confirmation", { state: { email } });
+          navigate("/welcome", { state: { email } });
         }
       }
     } finally {
