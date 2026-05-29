@@ -103,7 +103,6 @@ const CreateCreative = () => {
   const [cta, setCta] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatedAngles, setGeneratedAngles] = useState<CopyAngle[] | null>(null);
-  const [adCaptions, setAdCaptions] = useState<{ caption: string }[]>([]);
   const [selectedAngle, setSelectedAngle] = useState<number | null>(null);
   const [format, setFormat] = useState("1:1");
   const [imageModel, setImageModel] = useState("gpt-image-2");
@@ -332,7 +331,6 @@ const CreateCreative = () => {
         ...a,
         visual_concept: a.visual_concept ?? null,
       })));
-      setAdCaptions(copyData.ad_captions || []);
       setSelectedAngle(null);
 
       await supabase

@@ -74,19 +74,8 @@ const tools = [
               required: ["angle_name", "headline", "body", "cta", "visual_concept"],
             },
           },
-          ad_captions: {
-            type: "array",
-            description: "3 opções de legenda para o anúncio/postagem",
-            items: {
-              type: "object",
-              properties: {
-                caption: { type: "string", description: "Legenda completa pronta para uso" },
-              },
-              required: ["caption"],
-            },
-          },
         },
-        required: ["angles", "ad_captions"],
+        required: ["angles"],
       },
     },
   },
@@ -166,7 +155,7 @@ ${creative_style ? `Estilo visual desejado: ${creative_style}` : ""}
 
 ⚠️ REGRA DE CTA — OBRIGATÓRIA: O texto "${cta || "Compre agora"}" deve aparecer EXATAMENTE e INTEGRALMENTE no campo cta de cada ângulo. Você pode complementar com uma frase curta de gatilho (urgência ou curiosidade) posicionada antes ou depois, mas o texto original NÃO pode ser alterado, substituído ou parafraseado. Exemplos válidos: "Só hoje! ${cta || "Compre agora"}" ou "${cta || "Compre agora"} — vagas limitadas". Exemplos INVÁLIDOS: qualquer versão que não contenha "${cta || "Compre agora"}" literalmente.
 
-REGRA DE LEGENDAS: Gere também 3 opções de legenda. Estrutura: 1) Gancho forte, 2) Desenvolvimento persuasivo (2-3 frases curtas), 3) CTA final. Máximo 280 caracteres por legenda.${additional_instructions ? `\n\nLEMBRETE FINAL: A instrução prioritária "${additional_instructions}" deve estar refletida em todos os elementos gerados.` : ""}\n\nLEMBRETE CRÍTICO — INSTRUÇÃO INVIOLÁVEL: O CTA de TODOS os ângulos DEVE começar obrigatoriamente com as palavras exatas: "${cta || "Compre agora"}". É PROIBIDO usar qualquer outro CTA que não inicie com essa frase. Complementos são permitidos após as palavras do CTA base, mas as palavras originais devem estar presentes e inalteradas.`;
+${additional_instructions ? `\n\nLEMBRETE FINAL: A instrução prioritária "${additional_instructions}" deve estar refletida em todos os elementos gerados.` : ""}\n\nLEMBRETE CRÍTICO — INSTRUÇÃO INVIOLÁVEL: O CTA de TODOS os ângulos DEVE começar obrigatoriamente com as palavras exatas: "${cta || "Compre agora"}". É PROIBIDO usar qualquer outro CTA que não inicie com essa frase. Complementos são permitidos após as palavras do CTA base, mas as palavras originais devem estar presentes e inalteradas.`;
 
     let response;
     try {
