@@ -3,10 +3,13 @@
 ## Visão geral do fluxo
 
 ```
-Hotmart Webhook → N8N
+Hotmart Webhook (compra) → N8N
   └─ check-user-exists   → usuário existe?
        ├─ Sim → update-hotmart-user  (atualiza plano ou adiciona créditos)
        └─ Não → create-hotmart-user  (cria usuário + envia email de boas-vindas)
+
+Hotmart Webhook (reembolso) → N8N
+  └─ cancel-hotmart-user  (cancela assinatura, zera créditos e remove o usuário)
 ```
 
 ---
@@ -66,9 +69,9 @@ Cria um novo usuário com email confirmado, assinatura ativa e envia email de bo
 **Request:**
 ```json
 {
-  "email":                  "usuario@exemplo.com",
-  "name":                   "João Silva",
-  "plan":                   "PLANO MENSAL PRO",
+  "email": "usuario@exemplo.com",
+  "name":  "João Silva",
+  "plan":  "PLANO MENSAL PRO"
 }
 ```
 
@@ -93,8 +96,8 @@ Atualiza o plano de um usuário existente OU adiciona créditos extras.
 **Request — atualização de plano:**
 ```json
 {
-  "email":                  "usuario@exemplo.com",
-  "plan":                   "PLANO ANUAL ADVANCED",
+  "email": "usuario@exemplo.com",
+  "plan":  "PLANO ANUAL ADVANCED"
 }
 ```
 
@@ -114,6 +117,33 @@ O `billing_cycle` é derivado automaticamente do nome do plano.
 {
   "success": true,
   "message": "Plano e créditos atualizados"
+}
+```
+
+---
+
+### 4. `POST /cancel-hotmart-user`
+
+Cancela a assinatura, zera todos os créditos e remove o usuário do sistema. Utilizado para reembolsos.
+
+**Request:**
+```json
+{ "email": "usuario@exemplo.com" }
+```
+
+**Campo obrigatório:** `email`
+
+**Fluxo executado:**
+1. Localiza o usuário pelo email
+2. Cancela a assinatura ativa (`status = cancelled`)
+3. Zera `credits_balance`, `subscription_credits` e `extra_credits`
+4. Exclui o usuário do Supabase Auth (remoção definitiva)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Assinatura cancelada e usuário removido"
 }
 ```
 
@@ -140,7 +170,7 @@ O `billing_cycle` é derivado automaticamente — não precisa ser enviado.
 ## Cenário N8N — Compra Hotmart
 
 ```
-[Hotmart Trigger]
+[Hotmart Trigger — compra aprovada]
     │
     ▼
 [HTTP Request] POST /check-user-exists
@@ -150,13 +180,28 @@ O `billing_cycle` é derivado automaticamente — não precisa ser enviado.
     ├─ exists = false
     │       ▼
     │  [HTTP Request] POST /create-hotmart-user
-    │       body: { email, name, plan, billing_cycle, hotmart_transaction_id }
+    │       body: { email, name, plan }
     │
     └─ exists = true
             ▼
        [HTTP Request] POST /update-hotmart-user
-            body: { email, plan, billing_cycle, hotmart_transaction_id }
+            body: { email, plan }
 ```
+
+## Cenário N8N — Reembolso Hotmart
+
+```
+[Hotmart Trigger — reembolso solicitado]
+    │
+    ▼
+[HTTP Request] POST /cancel-hotmart-user
+    │  body: { email }
+    │  header: Authorization: Bearer <WEBHOOK_SECRET>
+    │
+    └─ Assinatura cancelada + créditos zerados + usuário removido
+```
+
+---
 
 ### Mapeamento de campos Hotmart → N8N
 
@@ -164,9 +209,7 @@ O `billing_cycle` é derivado automaticamente — não precisa ser enviado.
 |---|---|
 | `data.buyer.email` | `email` |
 | `data.buyer.name` | `name` |
-| `data.product.id` → mapeado | `plan` |
-| `data.subscription.plan.recurrencyPeriod` | `billing_cycle` |
-| `data.purchase.transaction` | `hotmart_transaction_id` |
+| `data.product.name` | `plan` (nome exato do produto) |
 
 ---
 
