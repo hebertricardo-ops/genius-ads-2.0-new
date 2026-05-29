@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -89,6 +89,24 @@ const Index = () => {
   const navigate = useNavigate();
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [billingAnnual, setBillingAnnual] = useState(false);
+
+  useEffect(() => {
+    const eventId = crypto.randomUUID();
+
+    // Browser pixel
+    if (typeof window.fbq === "function") {
+      window.fbq("track", "PageView", {}, { eventID: eventId });
+    }
+
+    // Conversions API — server-side, mesmo event_id para deduplicação
+    supabase.functions.invoke("meta-capi", {
+      body: {
+        event_name: "PageView",
+        event_id: eventId,
+        event_source_url: window.location.href,
+      },
+    }).catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen gradient-hero">
