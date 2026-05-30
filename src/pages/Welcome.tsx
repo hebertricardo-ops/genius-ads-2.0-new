@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Zap, Image, Calendar, BarChart2, Mail } from "lucide-react";
@@ -14,13 +13,10 @@ const FEATURES = [
 const Welcome = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const email = (location.state as any)?.email ?? "";
-
-  useEffect(() => {
-    if (typeof window.fbq === "function") {
-      window.fbq("trackCustom", "CadastroRealizado");
-    }
-  }, []);
+  const state = (location.state as any) ?? {};
+  const email = state.email ?? "";
+  const fromGoogle = !!state.fromGoogle;
+  const name = state.name ?? "";
 
   return (
     <div className="min-h-screen gradient-hero flex items-center justify-center px-4">
@@ -44,7 +40,7 @@ const Welcome = () => {
           {/* Título */}
           <div className="space-y-2">
             <h1 className="font-display text-2xl text-foreground">
-              Bem-vindo ao Genius ADS!
+              {name ? `Bem-vindo, ${name.split(" ")[0]}!` : "Bem-vindo ao Genius ADS!"}
             </h1>
             <p className="text-muted-foreground text-sm leading-relaxed">
               Sua conta foi criada com sucesso. Você ganhou{" "}
@@ -66,33 +62,47 @@ const Welcome = () => {
             ))}
           </div>
 
-          {/* Aviso de email */}
-          <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 flex items-start gap-3 text-left">
-            <Mail className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-              Enviamos um link de confirmação
-              {email && <> para <strong>{email}</strong></>}.
-              {" "}Verifique sua caixa de entrada para ativar sua conta.
-            </p>
-          </div>
+          {/* Aviso de email — apenas para cadastro email/senha */}
+          {!fromGoogle && (
+            <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 flex items-start gap-3 text-left">
+              <Mail className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                Enviamos um link de confirmação
+                {email && <> para <strong>{email}</strong></>}.
+                {" "}Verifique sua caixa de entrada para ativar sua conta.
+              </p>
+            </div>
+          )}
 
           {/* CTAs */}
           <div className="space-y-3">
-            <Button
-              variant="hero"
-              className="w-full"
-              onClick={() => navigate("/email-confirmation", { state: { email } })}
-            >
-              <Mail className="h-4 w-4 mr-2" />
-              Verificar meu email
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full text-sm text-muted-foreground"
-              onClick={() => navigate("/dashboard")}
-            >
-              Já confirmei — acessar o painel →
-            </Button>
+            {fromGoogle ? (
+              <Button
+                variant="hero"
+                className="w-full"
+                onClick={() => navigate("/dashboard")}
+              >
+                Acessar o painel →
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="hero"
+                  className="w-full"
+                  onClick={() => navigate("/email-confirmation", { state: { email } })}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Verificar meu email
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full text-sm text-muted-foreground"
+                  onClick={() => navigate("/dashboard")}
+                >
+                  Já confirmei — acessar o painel →
+                </Button>
+              </>
+            )}
           </div>
         </div>
 

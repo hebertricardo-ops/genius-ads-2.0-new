@@ -18,6 +18,26 @@ const AuthCallback = () => {
         handled.current = true;
         if (isRecovery) {
           navigate("/change-password", { replace: true });
+          return;
+        }
+
+        const user = session.user;
+        const provider = user.app_metadata?.provider;
+        const isGoogleLogin = provider === "google";
+
+        if (isGoogleLogin) {
+          const createdAt = new Date(user.created_at).getTime();
+          const lastSignIn = new Date(user.last_sign_in_at ?? user.created_at).getTime();
+          const isNewUser = Math.abs(createdAt - lastSignIn) < 10000;
+
+          if (isNewUser) {
+            if (typeof window.fbq === "function") {
+              window.fbq("trackCustom", "CadastroRealizado");
+            }
+            navigate("/welcome", { replace: true, state: { fromGoogle: true, name: user.user_metadata?.full_name } });
+          } else {
+            navigate("/dashboard", { replace: true });
+          }
         } else {
           toast.success("Email confirmado! Bem-vindo ao Genius ADS 🎉");
           navigate("/dashboard", { replace: true });

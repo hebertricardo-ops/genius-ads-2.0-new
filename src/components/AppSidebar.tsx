@@ -48,6 +48,12 @@ export function AppSidebar() {
   const [createOpen, setCreateOpen] = useState(false);
   const [noBrandOpen, setNoBrandOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<"calendar" | "social_media" | "brands">("brands");
+
+  const openUpgrade = (feature: "calendar" | "social_media" | "brands") => {
+    setUpgradeFeature(feature);
+    setUpgradeOpen(true);
+  };
   const { selectedBrand, setSelectedBrand, brands } = useBrandContext();
   const { user, signOut } = useAuth();
   const { data: credits } = useCredits();
@@ -245,60 +251,81 @@ export function AppSidebar() {
 
               {/* Calendário */}
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink
-                    to="/calendario"
-                    end
-                    onClick={closeMobileIfNeeded}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-                    activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                {!hasCalendar ? (
+                  <SidebarMenuButton
+                    onClick={() => openUpgrade("calendar")}
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors cursor-pointer"
                   >
                     <CalendarDays className="h-4 w-4 shrink-0" />
                     {!collapsed && (
                       <>
                         <span className="flex-1">Calendário</span>
-                        {!hasCalendar && (
-                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground border border-border">
-                            <Lock className="w-2.5 h-2.5" />Advanced+
-                          </span>
-                        )}
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground border border-border">
+                          <Lock className="w-2.5 h-2.5" />Advanced+
+                        </span>
                       </>
                     )}
-                  </NavLink>
-                </SidebarMenuButton>
+                  </SidebarMenuButton>
+                ) : (
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to="/calendario"
+                      end
+                      onClick={closeMobileIfNeeded}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                    >
+                      <CalendarDays className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span>Calendário</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                )}
               </SidebarMenuItem>
 
               {/* Redes Sociais */}
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink
-                    to="/social-accounts"
-                    end
-                    onClick={closeMobileIfNeeded}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-                    activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                {!hasSocialMedia ? (
+                  <SidebarMenuButton
+                    onClick={() => openUpgrade("social_media")}
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors cursor-pointer"
                   >
                     <Smartphone className="h-4 w-4 shrink-0" />
                     {!collapsed && (
                       <>
                         <span className="flex-1">Redes Sociais</span>
-                        {!hasSocialMedia ? (
-                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground border border-border">
-                            <Lock className="w-2.5 h-2.5" />Advanced+
-                          </span>
-                        ) : socialConnected ? (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-green-500/15 text-green-500">
-                            Ativo
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/25">
-                            Conectar
-                          </span>
-                        )}
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground border border-border">
+                          <Lock className="w-2.5 h-2.5" />Advanced+
+                        </span>
                       </>
                     )}
-                  </NavLink>
-                </SidebarMenuButton>
+                  </SidebarMenuButton>
+                ) : (
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to="/social-accounts"
+                      end
+                      onClick={closeMobileIfNeeded}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                    >
+                      <Smartphone className="h-4 w-4 shrink-0" />
+                      {!collapsed && (
+                        <>
+                          <span className="flex-1">Redes Sociais</span>
+                          {socialConnected ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-green-500/15 text-green-500">
+                              Ativo
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/25">
+                              Conectar
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  </SidebarMenuButton>
+                )}
               </SidebarMenuItem>
 
               {/* Analytics */}
@@ -372,10 +399,9 @@ export function AppSidebar() {
         <UpgradeDialog
           open={upgradeOpen}
           onClose={() => setUpgradeOpen(false)}
-          feature="brands"
+          feature={upgradeFeature}
           currentPlan={planName}
-          currentLimit={effectiveBrandLimit}
-          currentCount={brands.length}
+          {...(upgradeFeature === "brands" ? { currentLimit: effectiveBrandLimit, currentCount: brands.length } : {})}
         />
       </SidebarContent>
 
