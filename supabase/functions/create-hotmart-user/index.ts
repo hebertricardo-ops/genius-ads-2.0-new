@@ -207,11 +207,11 @@ serve(async (req) => {
       });
     }
 
-    // Passo 4 — Atualizar créditos (trigger já criou a linha com 4 créditos base)
+    // Passo 4 — Atualizar créditos (sobrescreve os 60 do trigger pelo valor do plano)
     await supabaseAdmin
       .from("user_credits")
       .update({
-        credits_balance:      planCredits + 4,
+        credits_balance:      planCredits,
         subscription_credits: planCredits,
       })
       .eq("user_id", userId);
