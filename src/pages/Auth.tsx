@@ -91,13 +91,13 @@ const Auth = () => {
           return;
         }
 
-        const { data: userCheck } = await supabase.functions.invoke("check-user-exists", {
-          body: { email },
+        const { data: emailCheck } = await supabase.functions.invoke("check-email-available", {
+          body: { email: email.toLowerCase().trim() },
         });
-        if (userCheck?.exists) {
+        if (emailCheck?.available === false) {
           toast({
             title: "Email já cadastrado",
-            description: "Este email já possui uma conta no Genius ADS. Faça login ou use a opção 'Esqueci minha senha'.",
+            description: "Este email já possui uma conta no Genius ADS. Faça login ou use 'Esqueci minha senha'.",
             variant: "destructive",
           });
           setLoading(false);
