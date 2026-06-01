@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [navigate]);
 
   const signUp = async (email: string, password: string, name: string, whatsapp?: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -51,7 +51,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    return { error: error as Error | null };
+    // identities vazio = e-mail já cadastrado (Supabase retorna sucesso silencioso)
+    const isNewUser = (data?.user?.identities?.length ?? 0) > 0;
+    return { error: error as Error | null, isNewUser };
   };
 
   const signIn = async (email: string, password: string) => {
