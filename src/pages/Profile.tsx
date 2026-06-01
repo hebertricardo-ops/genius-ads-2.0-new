@@ -8,8 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Coins, Save, Loader2, ShoppingCart, Instagram, Facebook, Smartphone } from "lucide-react";
+import { Camera, Coins, Save, Loader2, ShoppingCart, Instagram, Facebook, Smartphone, Phone } from "lucide-react";
 import { useSocialPublish } from "@/hooks/useSocialPublish";
+
+const formatWhatsApp = (value: string) => {
+  const digits = value.replace(/\D/g, "").slice(0, 13);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
+  return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4)}`;
+};
 
 const Profile = () => {
   const { user } = useAuth();
@@ -36,6 +43,7 @@ const Profile = () => {
   });
 
   const [name, setName] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
@@ -43,6 +51,7 @@ const Profile = () => {
   if (profile && !initialized) {
     setName(profile.name ?? "");
     setAvatarUrl(profile.avatar_url ?? null);
+    setWhatsapp(formatWhatsApp(profile.whatsapp ?? ""));
     setInitialized(true);
   }
 
@@ -97,9 +106,10 @@ const Profile = () => {
     if (!user) return;
     setSaving(true);
     try {
+      const rawWhatsapp = whatsapp.replace(/\D/g, "");
       const { error } = await supabase
         .from("profiles")
-        .update({ name: name || displayName })
+        .update({ name: name || displayName, whatsapp: rawWhatsapp || null })
         .eq("user_id", user.id);
       if (error) throw error;
 
@@ -183,6 +193,20 @@ const Profile = () => {
             <div>
               <Label className="text-muted-foreground">E-mail</Label>
               <Input value={displayEmail} disabled className="mt-1 opacity-60" />
+            </div>
+            <div>
+              <Label htmlFor="whatsapp" className="text-muted-foreground flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5" /> WhatsApp
+              </Label>
+              <Input
+                id="whatsapp"
+                type="tel"
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(formatWhatsApp(e.target.value))}
+                placeholder="55 99 999999999"
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">DDI + DDD + número</p>
             </div>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
