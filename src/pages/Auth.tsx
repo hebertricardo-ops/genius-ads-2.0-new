@@ -96,6 +96,9 @@ const Auth = () => {
           toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
         } else {
           fireNewUserWebhook({ name, email, whatsapp: rawWhatsapp, plan: "free" });
+          supabase.functions.invoke("send-confirmation-email", {
+            body: { email, name },
+          }).catch((err) => console.error("Erro ao enviar email de confirmação:", err));
           navigate("/welcome", { state: { email } });
         }
       }

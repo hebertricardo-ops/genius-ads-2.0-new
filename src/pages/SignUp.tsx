@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { fireNewUserWebhook } from "@/lib/webhooks";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import logoFull from "@/assets/logo-full.png";
 import bgSignUp from "@/assets/background-signup.png";
@@ -67,6 +68,9 @@ const SignUp = () => {
         toast({ title: "Erro ao criar conta", description: msg, variant: "destructive" });
       } else {
         fireNewUserWebhook({ name, email, whatsapp: rawWhatsapp, plan: "free" });
+        supabase.functions.invoke("send-confirmation-email", {
+          body: { email, name },
+        }).catch((err) => console.error("Erro ao enviar email de confirmação:", err));
         navigate("/email-confirmation", { state: { email } });
       }
     } finally {
