@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,12 @@ const Welcome = () => {
 
   const [whatsapp, setWhatsapp] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.fbq === "function") {
+      window.fbq("trackCustom", "CadastroRealizado");
+    }
+  }, []);
 
   const rawWhatsapp = whatsapp.replace(/\D/g, "");
   const whatsappValid = rawWhatsapp.length >= 10;
