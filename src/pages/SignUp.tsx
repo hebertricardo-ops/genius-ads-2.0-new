@@ -150,6 +150,7 @@ const SignUp = () => {
               autoComplete="tel"
               className="h-9 text-sm"
             />
+            <p className="text-xs text-muted-foreground">Obrigatório para continuar. DDI + DDD + número.</p>
           </div>
 
           {/* Senha */}
