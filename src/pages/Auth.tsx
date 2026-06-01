@@ -91,9 +91,12 @@ const Auth = () => {
           return;
         }
 
-        const { data: emailCheck } = await supabase.functions.invoke("check-email-available", {
+        const { data: emailCheck, error: emailCheckError } = await supabase.functions.invoke("check-email-available", {
           body: { email: email.toLowerCase().trim() },
         });
+        console.log("emailCheck result:", emailCheck);
+        console.log("emailCheck error:", emailCheckError);
+        console.log("available:", emailCheck?.available);
         if (emailCheck?.available === false) {
           toast({
             title: "Email já cadastrado",
