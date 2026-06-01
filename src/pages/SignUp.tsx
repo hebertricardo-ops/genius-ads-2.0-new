@@ -59,11 +59,6 @@ const SignUp = () => {
           : error.message;
         toast({ title: "Erro ao criar conta", description: msg, variant: "destructive" });
       } else {
-        fetch("https://hook.us2.make.com/1ifgxwj2g4o47qa1lbo3ab51vumvoydy", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email }),
-        }).catch(() => {});
         fireNewUserWebhook({ name, email, plan: "free" });
 
         navigate("/email-confirmation", { state: { email } });

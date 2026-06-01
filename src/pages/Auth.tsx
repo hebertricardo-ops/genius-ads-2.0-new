@@ -95,11 +95,6 @@ const Auth = () => {
         if (error) {
           toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
         } else {
-          fetch("https://hook.us2.make.com/1ifgxwj2g4o47qa1lbo3ab51vumvoydy", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, email, whatsapp: rawWhatsapp }),
-          }).catch(() => {});
           fireNewUserWebhook({ name, email, whatsapp: rawWhatsapp, plan: "free" });
 
           navigate("/welcome", { state: { email } });
