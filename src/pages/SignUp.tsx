@@ -60,6 +60,20 @@ const SignUp = () => {
 
     setLoading(true);
     try {
+      // Verificar email disponível antes do signUp
+      const { data: emailCheck } = await supabase.functions.invoke("check-email-available", {
+        body: { email: email.toLowerCase().trim() },
+      });
+      if (emailCheck?.available === false) {
+        toast({
+          title: "Email já cadastrado",
+          description: "Este email já possui uma conta no Genius ADS. Faça login ou use 'Esqueci minha senha'.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       const { error } = await signUp(email, password, name, rawWhatsapp);
       if (error) {
         const msg = error.message.includes("already registered")
@@ -71,7 +85,7 @@ const SignUp = () => {
         supabase.functions.invoke("send-confirmation-email", {
           body: { email, name },
         }).catch((err) => console.error("Erro ao enviar email de confirmação:", err));
-        navigate("/email-confirmation", { state: { email } });
+        navigate("/welcome", { state: { email } });
       }
     } finally {
       setLoading(false);
