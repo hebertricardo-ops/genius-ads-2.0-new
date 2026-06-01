@@ -5,10 +5,11 @@ import { Label } from "@/components/ui/label";
 import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import logoFull from "@/assets/logo-full.png";
 import bgSignUp from "@/assets/background-signup.png";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { fireNewUserWebhook } from "@/lib/webhooks";
+import EmailExistsDialog from "@/components/EmailExistsDialog";
 import {
   Dialog,
   DialogContent,
@@ -25,9 +26,13 @@ const formatWhatsApp = (value: string) => {
 };
 
 const Auth = () => {
+  const location = useLocation();
+  const stateEmail = (location.state as any)?.email ?? "";
+  const stateMode  = (location.state as any)?.mode  ?? "";
+
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(stateEmail);
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -37,9 +42,15 @@ const Auth = () => {
   const [resetEmail, setResetEmail] = useState("");
   const [isResetting, setIsResetting] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [showEmailExists, setShowEmailExists] = useState(false);
+  const [existingEmail, setExistingEmail] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, signIn, signUp, signInWithGoogle, resetPasswordForEmail } = useAuth();
+
+  useEffect(() => {
+    if (stateMode === "login") setIsLogin(true);
+  }, [stateMode]);
 
   useEffect(() => {
     if (user) navigate("/dashboard", { replace: true });
@@ -91,18 +102,12 @@ const Auth = () => {
           return;
         }
 
-        const { data: emailCheck, error: emailCheckError } = await supabase.functions.invoke("check-email-available", {
+        const { data: emailCheck } = await supabase.functions.invoke("check-email-available", {
           body: { email: email.toLowerCase().trim() },
         });
-        console.log("emailCheck result:", emailCheck);
-        console.log("emailCheck error:", emailCheckError);
-        console.log("available:", emailCheck?.available);
         if (emailCheck?.available === false) {
-          toast({
-            title: "Email já cadastrado",
-            description: "Este email já possui uma conta no Genius ADS. Faça login ou use 'Esqueci minha senha'.",
-            variant: "destructive",
-          });
+          setExistingEmail(email);
+          setShowEmailExists(true);
           setLoading(false);
           return;
         }
@@ -242,6 +247,12 @@ const Auth = () => {
         </div>
       </div>
     </div>
+
+    <EmailExistsDialog
+      open={showEmailExists}
+      onClose={() => setShowEmailExists(false)}
+      email={existingEmail}
+    />
 
     <Dialog open={showForgotPassword} onOpenChange={(open) => { setShowForgotPassword(open); if (!open) setResetSent(false); }}>
       <DialogContent className="sm:max-w-md">

@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { fireNewUserWebhook } from "@/lib/webhooks";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import EmailExistsDialog from "@/components/EmailExistsDialog";
 import logoFull from "@/assets/logo-full.png";
 import bgSignUp from "@/assets/background-signup.png";
 
@@ -21,6 +22,8 @@ const SignUp = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [showEmailExists, setShowEmailExists] = useState(false);
+  const [existingEmail, setExistingEmail] = useState("");
 
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -65,11 +68,8 @@ const SignUp = () => {
         body: { email: email.toLowerCase().trim() },
       });
       if (emailCheck?.available === false) {
-        toast({
-          title: "Email já cadastrado",
-          description: "Este email já possui uma conta no Genius ADS. Faça login ou use 'Esqueci minha senha'.",
-          variant: "destructive",
-        });
+        setExistingEmail(email);
+        setShowEmailExists(true);
         setLoading(false);
         return;
       }
@@ -93,6 +93,7 @@ const SignUp = () => {
   };
 
   return (
+    <>
     <div className="min-h-screen relative flex items-center justify-center p-4">
       <div
         className="absolute inset-0 opacity-20 pointer-events-none"
@@ -305,6 +306,13 @@ const SignUp = () => {
 
       </div>
     </div>
+
+    <EmailExistsDialog
+      open={showEmailExists}
+      onClose={() => setShowEmailExists(false)}
+      email={existingEmail}
+    />
+    </>
   );
 };
 
