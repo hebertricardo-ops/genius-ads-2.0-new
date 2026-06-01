@@ -132,6 +132,8 @@ serve(async (req) => {
 
     const falResult = await falResponse.json();
     const generatedUrl = falResult?.images?.[0]?.url;
+    const falRequestId: string | undefined =
+      falResult?.request_id ?? falResponse.headers.get("x-fal-request-id") ?? undefined;
 
     if (!generatedUrl) {
       const raw = JSON.stringify(falResult).slice(0, 200);
@@ -165,6 +167,8 @@ serve(async (req) => {
 
     const resultImageUrl = urlData.publicUrl;
 
+    if (falRequestId) console.log(`[edit-creative] fal request_id: ${falRequestId}`);
+
     // Atualizar registro com resultado
     await supabaseAdmin
       .from("creative_edits")
@@ -172,6 +176,7 @@ serve(async (req) => {
         status: "completed",
         result_image_url: resultImageUrl,
         edit_prompt_raw: translatedPrompt,
+        fal_request_id: falRequestId ?? null,
       })
       .eq("id", editId);
 

@@ -163,7 +163,7 @@ function buildFalPrompt(
 async function generateSlideWithFal(
   prompt: string,
   referenceImageUrls: string[],
-): Promise<string> {
+): Promise<{ imageUrl: string; falRequestId: string | undefined }> {
   const FAL_KEY = Deno.env.get("FAL_KEY");
   if (!FAL_KEY) throw new Error("FAL_KEY not configured");
 
@@ -201,8 +201,11 @@ async function generateSlideWithFal(
     throw new Error("No image URL in fal.ai response");
   }
 
+  const falRequestId: string | undefined =
+    resultData?.request_id ?? res.headers.get("x-fal-request-id") ?? undefined;
+
   console.log(`[fal.ai] Image generated: ${imageUrl.substring(0, 80)}...`);
-  return imageUrl;
+  return { imageUrl, falRequestId };
 }
 
 async function downloadAndUploadToStorage(
@@ -513,7 +516,7 @@ async function handleImagesWithFal(
   userId: string | null,
   creditsCost: number,
 ) {
-  const generatedSlides: Array<{ slide_number: number; image_url: string }> = [];
+  const generatedSlides: Array<{ slide_number: number; image_url: string; fal_request_id: string | null }> = [];
   const failedSlides: number[] = [];
 
   for (let i = 0; i < copy.slides.length; i++) {
@@ -531,10 +534,11 @@ async function handleImagesWithFal(
 
         const startTime = Date.now();
         const prompt = buildFalPrompt(slide, productName, creativeStyle, numSlides, undefined, false);
-        const falImageUrl = await generateSlideWithFal(prompt, imageUrls);
+        const { imageUrl: falImageUrl, falRequestId } = await generateSlideWithFal(prompt, imageUrls);
         const storageUrl = await downloadAndUploadToStorage(falImageUrl, supabaseAdmin);
 
-        generatedSlides.push({ slide_number: slide.slide_number, image_url: storageUrl });
+        if (falRequestId) console.log(`[fal.ai] request_id slide ${slide.slide_number}: ${falRequestId}`);
+        generatedSlides.push({ slide_number: slide.slide_number, image_url: storageUrl, fal_request_id: falRequestId ?? null });
 
         if (userId) {
           const { error: insertError } = await supabaseAdmin
@@ -542,6 +546,7 @@ async function handleImagesWithFal(
             .insert({
               user_id: userId,
               image_url: storageUrl,
+              fal_request_id: falRequestId ?? null,
               copy_data: {
                 headline: slide.headline,
                 body: slide.subtext,
@@ -877,8 +882,10 @@ async function handleSingleImageWithFal(
       const startTime = Date.now();
       const imageInstruction = body.image_instruction || undefined;
       const prompt = buildFalPrompt(slide, productName, creativeStyle, totalSlides || 1, existingSlideUrls, useAiImage, imageInstruction, includeLogoVisible, hasLogoReference);
-      const falImageUrl = await generateSlideWithFal(prompt, allRefUrls);
+      const { imageUrl: falImageUrl, falRequestId } = await generateSlideWithFal(prompt, allRefUrls);
       const storageUrl = await downloadAndUploadToStorage(falImageUrl, supabaseAdmin);
+
+      if (falRequestId) console.log(`[fal.ai] request_id slide ${slide.slide_number}: ${falRequestId}`);
 
       if (userId) {
         const { error: insertError } = await supabaseAdmin
@@ -886,6 +893,7 @@ async function handleSingleImageWithFal(
           .insert({
             user_id: userId,
             image_url: storageUrl,
+            fal_request_id: falRequestId ?? null,
             copy_data: {
               headline: slide.headline,
               body: slide.subtext,
@@ -904,7 +912,7 @@ async function handleSingleImageWithFal(
       console.log(`[fal.ai] Slide ${slide.slide_number} generated in ${elapsed}s`);
 
       return new Response(
-        JSON.stringify({ image_url: storageUrl, slide_number: slide.slide_number }),
+        JSON.stringify({ image_url: storageUrl, slide_number: slide.slide_number, fal_request_id: falRequestId ?? null }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } catch (e) {

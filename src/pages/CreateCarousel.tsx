@@ -476,6 +476,7 @@ const CreateCarousel = () => {
       if (data.error) throw new Error(data.error);
 
       const imageUrl = data.image_url;
+      const falRequestId: string | null = data.fal_request_id ?? null;
 
       const caption = editedCaption || generatedCopy?.ad_caption || "";
       await supabase.from("generated_creatives").insert({
@@ -483,6 +484,7 @@ const CreateCarousel = () => {
         image_url: imageUrl,
         carousel_request_id: requestId,
         brand_id: selectedBrand?.id ?? null,
+        fal_request_id: falRequestId,
         copy_data: {
           type: "carousel",
           slide_number: slide.slide_number,
@@ -631,6 +633,7 @@ const CreateCarousel = () => {
         if (data.error) throw new Error(data.error);
 
         const imageUrl: string = data.image_url;
+        const falRequestId: string | null = data.fal_request_id ?? null;
 
         setGenStatusMessage(`Slide ${slideNum} — salvando...`);
         const caption = editedCaption || generatedCopy?.ad_caption || "";
@@ -639,6 +642,7 @@ const CreateCarousel = () => {
           image_url: imageUrl,
           carousel_request_id: requestId,
           brand_id: selectedBrand?.id ?? null,
+          fal_request_id: falRequestId,
           copy_data: {
             type: "carousel",
             slide_number: slide.slide_number,

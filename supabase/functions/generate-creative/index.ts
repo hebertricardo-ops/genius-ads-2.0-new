@@ -134,7 +134,7 @@ async function falRequest(
   body: Record<string, unknown>,
   index: number,
   maxRetries = 3,
-): Promise<{ url: string }> {
+): Promise<{ url: string; falRequestId: string | undefined }> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const res = await fetch(url, {
       method: "POST",
@@ -166,7 +166,10 @@ async function falRequest(
       throw new Error(`No image in fal.ai response for index ${index}: ${JSON.stringify(result).substring(0, 500)}`);
     }
 
-    return { url: generatedUrl };
+    const falRequestId: string | undefined =
+      result?.request_id ?? res.headers.get("x-fal-request-id") ?? undefined;
+
+    return { url: generatedUrl, falRequestId };
   }
   throw new Error("Max retries exceeded");
 }
@@ -396,15 +399,16 @@ serve(async (req) => {
     const captionPromise = generateCaption(openaiKey, { product_name, headline, body, cta, pains, benefits });
 
     console.log(`Generating ${numImages} image(s) via fal.ai model: ${model || "gpt-image-2"}, logo: ${!!logo_url}, colors: ${color_palette?.length ?? 0}`);
-    const generatedImages: { url: string }[] = [];
+    const generatedImages: { url: string; falRequestId: string | undefined }[] = [];
     for (let i = 0; i < numImages; i++) {
       console.log(`Generating image ${i + 1}/${numImages}...`);
-      let img: { url: string };
+      let img: { url: string; falRequestId: string | undefined };
       if (model === "nano-banana-pro" || model === "nano-banana-2") {
         img = await generateNanoBanana(falKey, model, prompt, allImageUrls, format || "1:1", i);
       } else {
         img = await generateGptImage2(falKey, prompt, allImageUrls, aspectRatio, i);
       }
+      if (img.falRequestId) console.log(`fal request_id image ${i + 1}: ${img.falRequestId}`);
       generatedImages.push(img);
     }
 
@@ -431,7 +435,7 @@ serve(async (req) => {
           .from("generated-creatives")
           .getPublicUrl(fileName);
 
-        return { url: urlData.publicUrl };
+        return { url: urlData.publicUrl, falRequestId: img.falRequestId };
       })
     );
 
@@ -466,7 +470,11 @@ serve(async (req) => {
 
     console.log("Successfully generated and uploaded", uploadedUrls.length, "images");
 
-    return new Response(JSON.stringify({ images: uploadedUrls, caption }), {
+    return new Response(JSON.stringify({
+      images: uploadedUrls.map(({ url }) => ({ url })),
+      fal_request_ids: uploadedUrls.map(({ falRequestId }) => falRequestId ?? null),
+      caption,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

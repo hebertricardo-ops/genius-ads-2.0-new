@@ -461,6 +461,7 @@ const CreateCreative = () => {
       }
 
       const generatedImages = creativeData?.images || [];
+      const falRequestIds: (string | null)[] = creativeData?.fal_request_ids || [];
       const caption: string = creativeData?.caption || "";
 
       const { data: reqData } = await supabase
@@ -473,13 +474,15 @@ const CreateCreative = () => {
         .single();
       const requestId = reqData?.id;
 
-      for (const img of generatedImages) {
+      for (let imgIdx = 0; imgIdx < generatedImages.length; imgIdx++) {
+        const img = generatedImages[imgIdx];
         const imgUrl = img.url || img;
         await (supabase as any).from("generated_creatives").insert({
           user_id: user.id,
           image_url: imgUrl,
           request_id: requestId || null,
           brand_id: selectedBrand?.id ?? null,
+          fal_request_id: falRequestIds[imgIdx] ?? null,
           copy_data: {
             angle_name: method === "ideia" ? "Ideia formatada" : angle!.angle_name,
             headline: method === "ideia" ? formattedIdea!.angle : angle!.headline,
