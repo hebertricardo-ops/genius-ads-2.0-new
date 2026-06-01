@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { CheckCircle2, Zap, Image, Calendar, BarChart2, Mail, Loader2 } from "lucide-react";
 import logoIcon from "@/assets/logo-icon.png";
 import { supabase } from "@/integrations/supabase/client";
-import { fireNewUserWebhook } from "@/lib/webhooks";
 
 const FEATURES = [
   { icon: Zap,       text: "Gere criativos de alta conversão" },
@@ -47,7 +46,9 @@ const Welcome = () => {
     setSaving(true);
     try {
       await supabase.auth.updateUser({ data: { whatsapp: rawWhatsapp } });
-      fireNewUserWebhook({ name, email, whatsapp: rawWhatsapp, plan: "free" });
+      supabase.functions.invoke("notify-new-user", {
+        body: { name, email, whatsapp: rawWhatsapp },
+      }).catch((err) => console.error("Webhook error:", err));
     } catch {
       // fire-and-forget — não bloqueia navegação
     } finally {

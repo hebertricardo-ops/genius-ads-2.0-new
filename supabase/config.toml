@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.check-whatsapp-available]
 verify_jwt = false
+
+[functions.notify-new-user]
+verify_jwt = false

@@ -8,7 +8,6 @@ import bgSignUp from "@/assets/background-signup.png";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { fireNewUserWebhook } from "@/lib/webhooks";
 import EmailExistsDialog from "@/components/EmailExistsDialog";
 import WhatsappExistsDialog from "@/components/WhatsappExistsDialog";
 import {
@@ -129,7 +128,9 @@ const Auth = () => {
         if (error) {
           toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
         } else {
-          fireNewUserWebhook({ name, email, whatsapp: rawWhatsapp, plan: "free" });
+          supabase.functions.invoke("notify-new-user", {
+            body: { name, email, whatsapp: rawWhatsapp },
+          }).catch((err) => console.error("Webhook error:", err));
           supabase.functions.invoke("send-confirmation-email", {
             body: { email, name },
           }).catch((err) => console.error("Erro ao enviar email de confirmação:", err));
