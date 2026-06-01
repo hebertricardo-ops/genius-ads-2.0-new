@@ -137,11 +137,14 @@ const SignUp = () => {
             <Input
               id="whatsapp"
               type="tel"
-              placeholder="+55 (11) 99999-9999"
+              placeholder="55 11 988605957"
               value={whatsapp}
               onChange={(e) => {
                 const digits = e.target.value.replace(/\D/g, "").slice(0, 13);
-                setWhatsapp(digits ? `+${digits}` : "");
+                let formatted = digits;
+                if (digits.length > 4) formatted = `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4)}`;
+                else if (digits.length > 2) formatted = `${digits.slice(0, 2)} ${digits.slice(2)}`;
+                setWhatsapp(formatted);
               }}
               required
               autoComplete="tel"
