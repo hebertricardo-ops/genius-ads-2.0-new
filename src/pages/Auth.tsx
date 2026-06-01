@@ -8,6 +8,7 @@ import bgSignUp from "@/assets/background-signup.png";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { fireNewUserWebhook } from "@/lib/webhooks";
 import {
   Dialog,
   DialogContent,
@@ -94,12 +95,12 @@ const Auth = () => {
         if (error) {
           toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
         } else {
-          // Fire-and-forget webhook to Make.com
           fetch("https://hook.us2.make.com/1ifgxwj2g4o47qa1lbo3ab51vumvoydy", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name, email, whatsapp: rawWhatsapp }),
           }).catch(() => {});
+          fireNewUserWebhook({ name, email, whatsapp: rawWhatsapp, plan: "free" });
 
           navigate("/welcome", { state: { email } });
         }

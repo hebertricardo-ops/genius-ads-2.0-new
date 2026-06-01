@@ -34,7 +34,7 @@ const AuthCallback = () => {
             if (typeof window.fbq === "function") {
               window.fbq("trackCustom", "CadastroRealizado");
             }
-            navigate("/welcome", { replace: true, state: { fromGoogle: true, name: user.user_metadata?.full_name } });
+            navigate("/welcome", { replace: true, state: { fromGoogle: true, name: user.user_metadata?.full_name, email: user.email } });
           } else {
             navigate("/dashboard", { replace: true });
           }

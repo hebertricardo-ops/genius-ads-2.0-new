@@ -1,7 +1,12 @@
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Zap, Image, Calendar, BarChart2, Mail } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { CheckCircle2, Zap, Image, Calendar, BarChart2, Mail, Loader2 } from "lucide-react";
 import logoIcon from "@/assets/logo-icon.png";
+import { supabase } from "@/integrations/supabase/client";
+import { fireNewUserWebhook } from "@/lib/webhooks";
 
 const FEATURES = [
   { icon: Zap,       text: "Gere criativos de alta conversão" },
@@ -10,6 +15,13 @@ const FEATURES = [
   { icon: BarChart2, text: "Acompanhe analytics do seu perfil" },
 ];
 
+const formatWhatsApp = (value: string) => {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
+
 const Welcome = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,6 +29,31 @@ const Welcome = () => {
   const email = state.email ?? "";
   const fromGoogle = !!state.fromGoogle;
   const name = state.name ?? "";
+
+  const [whatsapp, setWhatsapp] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const rawWhatsapp = whatsapp.replace(/\D/g, "");
+
+  const handleConfirm = async () => {
+    setSaving(true);
+    try {
+      if (rawWhatsapp.length >= 10) {
+        await supabase.auth.updateUser({ data: { whatsapp: rawWhatsapp } });
+      }
+      fireNewUserWebhook({ name, email, whatsapp: rawWhatsapp.length >= 10 ? rawWhatsapp : null, plan: "free" });
+    } catch {
+      // fire-and-forget — não bloqueia navegação
+    } finally {
+      setSaving(false);
+      navigate("/dashboard");
+    }
+  };
+
+  const handleSkip = () => {
+    fireNewUserWebhook({ name, email, whatsapp: null, plan: "free" });
+    navigate("/dashboard");
+  };
 
   return (
     <div className="min-h-screen gradient-hero flex items-center justify-center px-4">
@@ -74,16 +111,50 @@ const Welcome = () => {
             </div>
           )}
 
+          {/* Campo WhatsApp — apenas para usuários Google */}
+          {fromGoogle && (
+            <div className="space-y-2 text-left">
+              <Label htmlFor="whatsapp" className="text-sm font-medium">
+                WhatsApp <span className="text-muted-foreground font-normal">(opcional)</span>
+              </Label>
+              <Input
+                id="whatsapp"
+                type="tel"
+                placeholder="(11) 99999-9999"
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(formatWhatsApp(e.target.value))}
+                className="h-9 text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Para receber suporte e novidades pelo WhatsApp.
+              </p>
+            </div>
+          )}
+
           {/* CTAs */}
           <div className="space-y-3">
             {fromGoogle ? (
-              <Button
-                variant="hero"
-                className="w-full"
-                onClick={() => navigate("/dashboard")}
-              >
-                Acessar o painel →
-              </Button>
+              <>
+                <Button
+                  variant="hero"
+                  className="w-full"
+                  onClick={handleConfirm}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : null}
+                  Confirmar e acessar o painel
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full text-sm text-muted-foreground"
+                  onClick={handleSkip}
+                  disabled={saving}
+                >
+                  Pular por agora →
+                </Button>
+              </>
             ) : (
               <>
                 <Button
