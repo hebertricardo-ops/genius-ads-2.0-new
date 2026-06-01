@@ -51,8 +51,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    // identities vazio = e-mail já cadastrado (Supabase retorna sucesso silencioso)
-    const isNewUser = (data?.user?.identities?.length ?? 0) > 0;
+    // user null = e-mail já cadastrado (Supabase retorna sucesso silencioso com user: null)
+    const isNewUser = data?.user != null;
     return { error: error as Error | null, isNewUser };
   };
 
