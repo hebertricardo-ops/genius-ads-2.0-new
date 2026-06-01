@@ -91,11 +91,9 @@ const Auth = () => {
           return;
         }
 
-        const { error, isNewUser } = await signUp(email, password, name, rawWhatsapp);
+        const { error } = await signUp(email, password, name, rawWhatsapp);
         if (error) {
           toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
-        } else if (!isNewUser) {
-          toast({ title: "E-mail já cadastrado", description: "Este e-mail já possui uma conta. Faça login.", variant: "destructive" });
         } else {
           fireNewUserWebhook({ name, email, whatsapp: rawWhatsapp, plan: "free" });
           navigate("/welcome", { state: { email } });
