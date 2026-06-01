@@ -102,6 +102,19 @@ const Auth = () => {
           return;
         }
 
+        const { data: waCheck } = await supabase.functions.invoke("check-whatsapp-available", {
+          body: { whatsapp: rawWhatsapp },
+        });
+        if (waCheck?.available === false) {
+          toast({
+            title: "WhatsApp já cadastrado",
+            description: "Este número já está vinculado a outra conta. Use um número diferente ou faça login na conta existente.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
         const { data: emailCheck } = await supabase.functions.invoke("check-email-available", {
           body: { email: email.toLowerCase().trim() },
         });
