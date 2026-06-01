@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { fireNewUserWebhook } from "@/lib/webhooks";
 import EmailExistsDialog from "@/components/EmailExistsDialog";
+import WhatsappExistsDialog from "@/components/WhatsappExistsDialog";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,8 @@ const Auth = () => {
   const [resetSent, setResetSent] = useState(false);
   const [showEmailExists, setShowEmailExists] = useState(false);
   const [existingEmail, setExistingEmail] = useState("");
+  const [showWhatsappExists, setShowWhatsappExists] = useState(false);
+  const [existingWhatsapp, setExistingWhatsapp] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, signIn, signUp, signInWithGoogle, resetPasswordForEmail } = useAuth();
@@ -106,11 +109,8 @@ const Auth = () => {
           body: { whatsapp: rawWhatsapp },
         });
         if (waCheck?.available === false) {
-          toast({
-            title: "WhatsApp já cadastrado",
-            description: "Este número já está vinculado a outra conta. Use um número diferente ou faça login na conta existente.",
-            variant: "destructive",
-          });
+          setExistingWhatsapp(whatsapp);
+          setShowWhatsappExists(true);
           setLoading(false);
           return;
         }
@@ -260,6 +260,12 @@ const Auth = () => {
         </div>
       </div>
     </div>
+
+    <WhatsappExistsDialog
+      open={showWhatsappExists}
+      onClose={() => setShowWhatsappExists(false)}
+      whatsapp={existingWhatsapp}
+    />
 
     <EmailExistsDialog
       open={showEmailExists}
