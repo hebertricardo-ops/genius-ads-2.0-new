@@ -53,6 +53,7 @@ export const useBrands = () => {
         .from("brands")
         .select("*")
         .eq("user_id", user!.id)
+        .eq("is_deleted", false)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Brand[];
@@ -95,7 +96,7 @@ export const useBrands = () => {
         .from("brands")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user!.id)
-        .eq("is_active", true);
+        .eq("is_deleted", false);
 
       const currentCount = count ?? 0;
       const effectiveLimit = sub ? maxBrands : freeLimit;
@@ -148,7 +149,7 @@ export const useBrands = () => {
 
   const deleteBrand = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await db.from("brands").update({ is_active: false }).eq("id", id);
+      const { error } = await db.from("brands").update({ is_deleted: true }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: invalidate,
