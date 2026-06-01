@@ -28,7 +28,7 @@ const EmailExistsDialog = ({ open, onClose, email }: EmailExistsDialogProps) => 
         </div>
 
         <DialogHeader className="text-center space-y-2">
-          <DialogTitle className="text-xl font-display">
+          <DialogTitle className="text-xl font-normal">
             Email já cadastrado
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
