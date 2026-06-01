@@ -121,7 +121,7 @@ const Welcome = () => {
               <Input
                 id="whatsapp"
                 type="tel"
-                placeholder="55 11 988605957"
+                placeholder="55 99 999999999"
                 value={whatsapp}
                 onChange={(e) => setWhatsapp(formatWhatsApp(e.target.value))}
                 className="h-9 text-sm"

@@ -137,7 +137,7 @@ const SignUp = () => {
             <Input
               id="whatsapp"
               type="tel"
-              placeholder="55 11 988605957"
+              placeholder="55 99 999999999"
               value={whatsapp}
               onChange={(e) => {
                 const digits = e.target.value.replace(/\D/g, "").slice(0, 13);
