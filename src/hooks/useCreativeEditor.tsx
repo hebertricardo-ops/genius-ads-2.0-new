@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ export interface EditVersion {
   imageUrl: string;
   label: string;
   createdAt: Date;
+  isOriginal: boolean;
 }
 
 interface UseCreativeEditorReturn {
@@ -25,6 +26,7 @@ interface UseCreativeEditorReturn {
   activeVersionIdx: number;
   selectedElement: string;
   isLoading: boolean;
+  isLoadingHistory: boolean;
   setSelectedElement: (el: string) => void;
   sendMessage: (params: {
     userMessage: string;
@@ -36,7 +38,10 @@ interface UseCreativeEditorReturn {
   selectVersion: (idx: number) => void;
 }
 
-export function useCreativeEditor(initialImageUrl: string): UseCreativeEditorReturn {
+export function useCreativeEditor(
+  initialImageUrl: string,
+  creativeId?: string,
+): UseCreativeEditorReturn {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -54,14 +59,70 @@ export function useCreativeEditor(initialImageUrl: string): UseCreativeEditorRet
       imageUrl: initialImageUrl,
       label: "Original",
       createdAt: new Date(),
+      isOriginal: true,
     },
   ]);
 
   const [activeVersionIdx, setActiveVersionIdx] = useState(0);
   const [selectedElement, setSelectedElement] = useState("free");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const currentImageUrl = versions[activeVersionIdx]?.imageUrl ?? initialImageUrl;
+
+  // Carrega edições anteriores do banco ao abrir o editor
+  useEffect(() => {
+    if (!creativeId || !initialImageUrl) return;
+
+    const loadHistory = async () => {
+      setIsLoadingHistory(true);
+      try {
+        const { data: previousEdits } = await supabase
+          .from("creative_edits")
+          .select("id, result_image_url, edit_element, created_at")
+          .eq("original_creative_id", creativeId)
+          .eq("status", "completed")
+          .order("created_at", { ascending: true });
+
+        if (!previousEdits?.length) return;
+
+        const loadedVersions: EditVersion[] = [
+          {
+            editId: null,
+            imageUrl: initialImageUrl,
+            label: "Original",
+            createdAt: new Date(),
+            isOriginal: true,
+          },
+          ...previousEdits.map((edit, idx) => ({
+            editId: edit.id,
+            imageUrl: edit.result_image_url,
+            label: `Edição ${idx + 1}`,
+            createdAt: new Date(edit.created_at),
+            isOriginal: false,
+          })),
+        ];
+
+        setVersions(loadedVersions);
+        setActiveVersionIdx(loadedVersions.length - 1);
+
+        const count = previousEdits.length;
+        const plural = count > 1;
+        setMessages([
+          {
+            role: "assistant",
+            content: `🎨 Este criativo tem ${count} edição${plural ? "ões" : ""} anterior${plural ? "es" : ""} carregada${plural ? "s" : ""}. Selecione uma versão no histórico abaixo ou continue editando a partir da versão atual.`,
+            createdAt: new Date(),
+          },
+        ]);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadHistory();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creativeId]);
 
   const sendMessage = useCallback(
     async ({
@@ -92,7 +153,6 @@ export function useCreativeEditor(initialImageUrl: string): UseCreativeEditorRet
         if (!session) throw new Error("Sessão expirada");
 
         const sourceImageUrl = currentImageUrl;
-
         const parentEditId = versions[activeVersionIdx]?.editId ?? null;
 
         const res = await fetch(
@@ -126,14 +186,16 @@ export function useCreativeEditor(initialImageUrl: string): UseCreativeEditorRet
           result_image_url: string;
         };
 
-        const newVersion: EditVersion = {
-          editId: edit_id,
-          imageUrl: result_image_url,
-          label: `Edição ${versions.length}`,
-          createdAt: new Date(),
-        };
-
-        setVersions((prev) => [...prev, newVersion]);
+        setVersions((prev) => {
+          const newVersion: EditVersion = {
+            editId: edit_id,
+            imageUrl: result_image_url,
+            label: `Edição ${prev.length}`,
+            createdAt: new Date(),
+            isOriginal: false,
+          };
+          return [...prev, newVersion];
+        });
         setActiveVersionIdx((prev) => prev + 1);
 
         const assistantMsg: EditMessage = {
@@ -172,6 +234,7 @@ export function useCreativeEditor(initialImageUrl: string): UseCreativeEditorRet
     activeVersionIdx,
     selectedElement,
     isLoading,
+    isLoadingHistory,
     setSelectedElement,
     sendMessage,
     selectVersion,

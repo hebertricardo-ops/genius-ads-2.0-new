@@ -277,7 +277,7 @@ function VersionHistory({
               alt={v.label}
               className="w-12 h-12 object-cover"
             />
-            {idx === 0 && (
+            {v.isOriginal && (
               <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-[8px] text-white text-center py-0.5">
                 Original
               </span>
@@ -329,7 +329,7 @@ const CreativeEditor = () => {
     setSelectedElement,
     sendMessage,
     selectVersion,
-  } = useCreativeEditor(imageUrl);
+  } = useCreativeEditor(imageUrl, creativeId);
 
   const [inputValue, setInputValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -359,6 +359,7 @@ const CreativeEditor = () => {
           original_creative_id: creativeId,
         },
         credits_used: 6,
+        source: "edit_ia",
       });
 
       if (error) throw error;

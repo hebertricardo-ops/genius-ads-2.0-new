@@ -323,13 +323,14 @@ serve(async (req) => {
       cta,
       visual_option,
       format,
-      quantity,
       color_palette,
       creative_style,
       additional_instructions,
       image_instructions,
       request_id,
       model,
+      credits_override,
+      save_data,
     } = await req.json();
 
     if (!image_urls?.length && !logo_url) throw new Error("At least one image or a logo is required");
@@ -345,8 +346,8 @@ serve(async (req) => {
     } catch { /* ignore */ }
 
     const CREDITS_PER_IMAGE = 10;
-    const numImages = Math.min(Math.max(1, quantity || 1), 4);
-    const totalCost = CREDITS_PER_IMAGE * numImages;
+    const numImages = 1;
+    const totalCost = credits_override ?? CREDITS_PER_IMAGE;
     const aspectRatio = FORMAT_TO_IMAGE_SIZE[format] || "square_hd";
 
     // Verificar saldo ANTES de chamar o fal.ai
@@ -450,7 +451,7 @@ serve(async (req) => {
 
     // Deduzir créditos APÓS sucesso (operação atômica — sem race condition)
     if (userId && uploadedUrls.length > 0) {
-      const amountToDeduct = CREDITS_PER_IMAGE * uploadedUrls.length;
+      const amountToDeduct = totalCost * uploadedUrls.length;
       const { data: deductResult } = await supabaseAdmin.rpc("deduct_credits", {
         p_user_id: userId,
         p_amount: amountToDeduct,
@@ -470,9 +471,37 @@ serve(async (req) => {
 
     console.log("Successfully generated and uploaded", uploadedUrls.length, "images");
 
+    // INSERT em generated_creatives via supabaseAdmin (server-side, sem RLS, sem risco de sessão)
+    let creativeId: string | null = null;
+    if (userId && save_data && uploadedUrls.length > 0) {
+      const { url: imageUrl, falRequestId } = uploadedUrls[0];
+      const finalCopyData = { ...(save_data.copy_data ?? {}), caption };
+      const { data: insertData, error: insertError } = await supabaseAdmin
+        .from("generated_creatives")
+        .insert({
+          user_id: userId,
+          image_url: imageUrl,
+          request_id: save_data.request_id ?? null,
+          brand_id: save_data.brand_id ?? null,
+          fal_request_id: falRequestId ?? null,
+          copy_data: finalCopyData,
+          credits_used: totalCost,
+          source: save_data.source ?? "generated",
+        })
+        .select("id")
+        .single();
+      if (insertError) {
+        console.error("Failed to insert generated_creative:", insertError.message);
+      } else {
+        creativeId = insertData.id;
+        console.log(`Inserted generated_creative: ${creativeId}`);
+      }
+    }
+
     return new Response(JSON.stringify({
-      images: uploadedUrls.map(({ url }) => ({ url })),
-      fal_request_ids: uploadedUrls.map(({ falRequestId }) => falRequestId ?? null),
+      creative_id: creativeId,
+      image_url: uploadedUrls[0]?.url ?? null,
+      fal_request_id: uploadedUrls[0]?.falRequestId ?? null,
       caption,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

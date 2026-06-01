@@ -94,7 +94,8 @@ const CreateCreative = () => {
   const [dialogImage, setDialogImage] = useState<File[]>([]);
   const [dialogInstruction, setDialogInstruction] = useState("");
   const [includeLogo, setIncludeLogo] = useState(true);
-  const [quantity, setQuantity] = useState(1);
+  const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
+
   const [productName, setProductName] = useState("");
   const [promise, setPromise] = useState("");
   const [pains, setPains] = useState("");
@@ -287,7 +288,7 @@ const CreateCreative = () => {
   // ── handleGenerate (copy generation) ─────────────────────────────────────
   const handleGenerate = async () => {
     if (!user) return;
-    if ((credits?.credits_balance ?? 0) < quantity) {
+    if ((credits?.credits_balance ?? 0) < 10) {
       setIsCreditsDialogOpen(true);
       return;
     }
@@ -333,6 +334,7 @@ const CreateCreative = () => {
       })));
       setSelectedAngle(null);
 
+      setCurrentRequestId(request.id);
       await supabase
         .from("creative_requests")
         .update({ status: "completed" })
@@ -381,7 +383,7 @@ const CreateCreative = () => {
         }
       : angle?.visual_concept;
 
-    if ((credits?.credits_balance ?? 0) < quantity) {
+    if ((credits?.credits_balance ?? 0) < 10) {
       toast({ title: "Créditos insuficientes", description: "Você não tem créditos suficientes para gerar.", variant: "destructive" });
       return;
     }
@@ -443,12 +445,24 @@ const CreateCreative = () => {
             thematic_elements: visual.thematic_elements,
           } : undefined,
           format,
-          quantity,
           creative_style: creativeStyle || undefined,
           color_palette: brandColors.length > 0 ? brandColors : undefined,
           additional_instructions: additionalInstructions.trim() || undefined,
           image_instructions: imageInstructions.length > 0 ? imageInstructions : undefined,
           model: imageModel,
+          save_data: {
+            request_id: currentRequestId,
+            brand_id: selectedBrand?.id ?? null,
+            copy_data: {
+              angle_name: method === "ideia" ? "Ideia formatada" : angle!.angle_name,
+              headline: method === "ideia" ? formattedIdea!.angle : angle!.headline,
+              subheadline: method === "ideia" ? undefined : angle!.subheadline,
+              body: method === "ideia" ? formattedIdea!.summary : angle!.body,
+              cta: method === "ideia" ? (cta || "Saiba mais") : angle!.cta,
+              visual_option: visual ?? null,
+              format,
+            },
+          },
         },
       });
       if (creativeError) {
@@ -460,49 +474,14 @@ const CreateCreative = () => {
         throw new Error(errorMsg);
       }
 
-      const generatedImages = creativeData?.images || [];
-      const falRequestIds: (string | null)[] = creativeData?.fal_request_ids || [];
-      const caption: string = creativeData?.caption || "";
-
-      const { data: reqData } = await supabase
-        .from("creative_requests")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("product_name", productName)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      const requestId = reqData?.id;
-
-      for (let imgIdx = 0; imgIdx < generatedImages.length; imgIdx++) {
-        const img = generatedImages[imgIdx];
-        const imgUrl = img.url || img;
-        await (supabase as any).from("generated_creatives").insert({
-          user_id: user.id,
-          image_url: imgUrl,
-          request_id: requestId || null,
-          brand_id: selectedBrand?.id ?? null,
-          fal_request_id: falRequestIds[imgIdx] ?? null,
-          copy_data: {
-            angle_name: method === "ideia" ? "Ideia formatada" : angle!.angle_name,
-            headline: method === "ideia" ? formattedIdea!.angle : angle!.headline,
-            subheadline: method === "ideia" ? undefined : angle!.subheadline,
-            body: method === "ideia" ? formattedIdea!.summary : angle!.body,
-            cta: method === "ideia" ? (cta || "Saiba mais") : angle!.cta,
-            visual_option: visual ?? null,
-            format,
-            caption,
-          },
-          credits_used: 10,
-        });
-      }
+      if (!creativeData?.image_url) throw new Error("Criativo não foi gerado. Tente novamente.");
 
       queryClient.invalidateQueries({ queryKey: ["credits"] });
       queryClient.invalidateQueries({ queryKey: ["creative-requests"] });
 
-      toast({ title: "Criativos gerados!", description: `${generatedImages.length} criativo(s) gerado(s) com sucesso.` });
-      if (requestId) {
-        navigate(`/results/${requestId}`);
+      toast({ title: "Criativo gerado!", description: "Seu criativo foi gerado com sucesso." });
+      if (currentRequestId) {
+        navigate(`/results/${currentRequestId}`);
       } else {
         navigate("/dashboard");
       }
@@ -677,27 +656,6 @@ const CreateCreative = () => {
                       />
                     </div>
                   )}
-                </div>
-
-                <div className="space-y-3 pt-2 border-t border-border">
-                  <h2 className="text-xl font-display text-foreground pt-2">Quantidade de criativos</h2>
-                  <div className="flex gap-3">
-                    {[1, 2, 3, 4].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => setQuantity(num)}
-                        className={`flex items-center justify-center w-14 h-14 rounded-xl border-2 text-lg font-bold transition-all duration-200 ${
-                          quantity === num
-                            ? "border-primary bg-primary/10 text-primary shadow-md scale-105"
-                            : "border-border bg-background/50 text-muted-foreground hover:border-primary/50 hover:bg-primary/5"
-                        }`}
-                      >
-                        {num}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Cada criativo consome 1 crédito</p>
                 </div>
 
                 <div className="space-y-3 pt-2 border-t border-border">
@@ -1227,7 +1185,7 @@ const CreateCreative = () => {
       <InsufficientCreditsDialog
         open={isCreditsDialogOpen}
         onClose={() => setIsCreditsDialogOpen(false)}
-        creditsNeeded={quantity}
+        creditsNeeded={10}
         creditsAvailable={credits?.credits_balance ?? 0}
       />
     </div>

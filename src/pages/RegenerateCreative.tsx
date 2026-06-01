@@ -97,6 +97,7 @@ const RegenerateCreative = () => {
   const [showAnglesView, setShowAnglesView] = useState(false);
   const [generatedAngles, setGeneratedAngles] = useState<CopyAngle[] | null>(null);
   const [selectedAngle, setSelectedAngle] = useState<number | null>(null);
+  const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
   const [format, setFormat] = useState("1:1");
   const [imageModel, setImageModel] = useState("gpt-image-2");
   const [generatingCreative, setGeneratingCreative] = useState(false);
@@ -215,6 +216,7 @@ const RegenerateCreative = () => {
       })));
       setSelectedAngle(null);
 
+      setCurrentRequestId(request.id);
       await supabase
         .from("creative_requests")
         .update({ status: "completed" })
@@ -249,7 +251,7 @@ const RegenerateCreative = () => {
     const angle = generatedAngles[selectedAngle];
     const visual = angle.visual_concept;
 
-    if ((credits?.credits_balance ?? 0) < quantity) {
+    if ((credits?.credits_balance ?? 0) < 10) {
       toast({ title: "Créditos insuficientes", description: "Você não tem créditos suficientes para gerar.", variant: "destructive" });
       return;
     }
@@ -311,12 +313,24 @@ const RegenerateCreative = () => {
             thematic_elements: visual.thematic_elements,
           } : undefined,
           format,
-          quantity,
           creative_style: creativeStyle || undefined,
           color_palette: brandColors.length > 0 ? brandColors : undefined,
           additional_instructions: additionalInstructions.trim() || undefined,
           image_instructions: imageInstructions.length > 0 ? imageInstructions : undefined,
           model: imageModel,
+          save_data: {
+            request_id: currentRequestId,
+            brand_id: selectedBrand?.id ?? null,
+            copy_data: {
+              angle_name: angle.angle_name,
+              headline: angle.headline,
+              subheadline: angle.subheadline,
+              body: angle.body,
+              cta: angle.cta,
+              visual_option: visual ?? null,
+              format,
+            },
+          },
         },
       });
       if (creativeError) {
@@ -328,72 +342,14 @@ const RegenerateCreative = () => {
         throw new Error(errorMsg);
       }
 
-      const generatedImages = creativeData?.images || [];
-      const caption: string = creativeData?.caption || "";
-
-      const { data: reqData } = await supabase
-        .from("creative_requests")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("product_name", productName)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      const requestId = reqData?.id;
-
-      for (const img of generatedImages) {
-        const imgUrl = img.url || img;
-        await (supabase as any).from("generated_creatives").insert({
-          user_id: user.id,
-          image_url: imgUrl,
-          request_id: requestId || null,
-          brand_id: selectedBrand?.id ?? null,
-          copy_data: {
-            angle_name: angle.angle_name,
-            headline: angle.headline,
-            subheadline: angle.subheadline,
-            body: angle.body,
-            cta: angle.cta,
-            visual_option: visual ?? null,
-            format,
-            caption,
-          },
-          credits_used: 1,
-        });
-      }
-
-      const usedCredits = generatedImages.length || quantity;
-      const { data: freshCredits } = await supabase
-        .from("user_credits")
-        .select("credits_balance, credits_used")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!freshCredits || freshCredits.credits_balance < usedCredits) {
-        throw new Error("Créditos insuficientes");
-      }
-
-      await supabase
-        .from("user_credits")
-        .update({
-          credits_balance: freshCredits.credits_balance - usedCredits,
-          credits_used: freshCredits.credits_used + usedCredits,
-        })
-        .eq("user_id", user.id);
-
-      await supabase.from("credit_transactions").insert({
-        user_id: user.id,
-        type: "usage",
-        amount: -usedCredits,
-        description: `Criativos regenerados: ${productName} (${angle.angle_name})`,
-      });
+      if (!creativeData?.image_url) throw new Error("Criativo não foi gerado. Tente novamente.");
 
       queryClient.invalidateQueries({ queryKey: ["credits"] });
       queryClient.invalidateQueries({ queryKey: ["creative-requests"] });
 
-      toast({ title: "Criativos gerados!", description: `${generatedImages.length} criativo(s) gerado(s) com sucesso.` });
-      if (requestId) {
-        navigate(`/results/${requestId}`);
+      toast({ title: "Criativo gerado!", description: "Seu criativo foi gerado com sucesso." });
+      if (currentRequestId) {
+        navigate(`/results/${currentRequestId}`);
       } else {
         navigate("/dashboard");
       }

@@ -481,8 +481,8 @@ const History = () => {
     const info = getRequestInfo(selectedCreative);
     if (!info || info.type !== "creative") return;
 
-    if ((credits?.credits_balance ?? 0) < 1) {
-      toast({ title: "Créditos insuficientes", description: "Você precisa de pelo menos 1 crédito para adaptar o formato.", variant: "destructive" });
+    if ((credits?.credits_balance ?? 0) < 6) {
+      toast({ title: "Créditos insuficientes", description: "Você precisa de pelo menos 6 créditos para adaptar o formato.", variant: "destructive" });
       return;
     }
 
@@ -514,46 +514,19 @@ const History = () => {
           cta: copyData.cta || req.cta || "",
           visual_option: visualOption,
           format: adaptFormat,
-          quantity: 1,
+          credits_override: 6,
           model: "gpt-image-2",
+          save_data: {
+            request_id: selectedCreative.request_id ?? null,
+            brand_id: selectedCreative.brand_id ?? null,
+            copy_data: { ...copyData, format: adaptFormat },
+            source: "adapt_format",
+          },
         },
       });
       if (error) throw new Error(error.message);
 
-      const generatedImages = creativeData?.images || [];
-      const newCaption: string = creativeData?.caption || originalCaption;
-
-      for (const img of generatedImages) {
-        const imgUrl = img.url || img;
-        await (supabase as any).from("generated_creatives").insert({
-          user_id: user.id,
-          image_url: imgUrl,
-          request_id: selectedCreative.request_id,
-          brand_id: selectedCreative.brand_id,
-          copy_data: { ...copyData, format: adaptFormat, caption: newCaption },
-          credits_used: 1,
-        });
-      }
-
-      const usedCredits = generatedImages.length || 1;
-      const { data: freshCredits } = await supabase
-        .from("user_credits")
-        .select("credits_balance, credits_used")
-        .eq("user_id", user.id)
-        .single();
-
-      if (freshCredits && freshCredits.credits_balance >= usedCredits) {
-        await supabase.from("user_credits").update({
-          credits_balance: freshCredits.credits_balance - usedCredits,
-          credits_used: freshCredits.credits_used + usedCredits,
-        }).eq("user_id", user.id);
-        await supabase.from("credit_transactions").insert({
-          user_id: user.id,
-          type: "usage",
-          amount: -usedCredits,
-          description: `Adaptação de formato: ${req.product_name} (${adaptFormat})`,
-        });
-      }
+      if (!creativeData?.image_url) throw new Error("Criativo não foi gerado. Tente novamente.");
 
       queryClient.invalidateQueries({ queryKey: ["gallery-creatives"] });
       queryClient.invalidateQueries({ queryKey: ["credits"] });
