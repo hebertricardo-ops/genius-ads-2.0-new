@@ -44,6 +44,7 @@
 
 | Plano | Mensal | Anual | Créditos | Marcas | Perfis sociais | Calendar/Social/Analytics |
 |---|---|---|---|---|---|---|
+| FREE | R$0 | — | 60 | 2 | — | ❌ |
 | PRO | R$59,90 | R$539,10 | 500 | 4 | — | ❌ |
 | Advanced | R$99,90 | R$899,10 | 1.000 | 10 | 2 | ✅ |
 | Social Media | R$199,90 | R$1.799,10 | 2.000 | Ilimitado | 6 | ✅ |
@@ -135,7 +136,10 @@
 ### Core de Geração
 - Geração de criativos estáticos (10 créditos)
 - Geração de carrosséis com IA (10 créditos/slide)
-- Seleção de objetivo (engajamento/venda) e método (zero/ideia/link)
+- Seleção de objetivo (engajamento/venda)
+- Método "Criar do Zero" ✅
+- Método "A partir de uma Ideia" ✅
+- Método "A partir de um Link" ⏳ pendente
 - Editor de criativos com IA — chat + histórico de versões (6 créditos)
 - Adaptar formato de criativo (6 créditos)
 - Legenda única gerada para criativos e carrosséis
@@ -223,11 +227,13 @@
 
 ## Pendências para Lançamento Completo
 
+### Concluído
+- ✅ Deploy frontend em produção (Hostinger)
+- ✅ Conectar botões de compra com URL do Hotmart na landing page
+- ✅ Configurar cenário N8N para Hotmart → Genius ADS
+- ✅ Banner WhatsApp para usuários Google — não necessário
+
 ### Alta prioridade
-- [ ] Banner WhatsApp para usuários Google sem número cadastrado
-- [ ] Deploy frontend em produção (Hostinger)
-- [ ] Conectar botões de compra com URL do Hotmart na landing page
-- [ ] Configurar cenário N8N para Hotmart → Genius ADS
 
 ### Média prioridade
 - [ ] Camada 2 anti-abuso: captura de IP no cadastro como sinal de alerta
@@ -238,7 +244,7 @@
 - [ ] Upload de Mídia Própria (aguarda Supabase Pro)
 - [ ] SMS OTP Twilio (aguarda 20+ usuários ativos)
 - [ ] Analytics avançado com Apify (top posts, mix de conteúdo)
-- [ ] Fluxo Instagram no Brand Setup (Apify — já planejado)
+- [ ] Método de criação A partir de um Link (URL → Apify scraping → preencher formulário) ⏳ pendente
 
 ---
 
