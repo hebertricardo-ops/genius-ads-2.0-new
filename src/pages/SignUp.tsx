@@ -13,6 +13,7 @@ import bgSignUp from "@/assets/background-signup.png";
 const SignUp = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -50,16 +51,22 @@ const SignUp = () => {
       return;
     }
 
+    const rawWhatsapp = whatsapp.replace(/\D/g, "");
+    if (rawWhatsapp.length < 10) {
+      toast({ title: "WhatsApp inválido", description: "Informe DDI + DDD + número com pelo menos 10 dígitos.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     try {
-      const { error } = await signUp(email, password, name);
+      const { error } = await signUp(email, password, name, rawWhatsapp);
       if (error) {
         const msg = error.message.includes("already registered")
           ? "Este e-mail já está cadastrado."
           : error.message;
         toast({ title: "Erro ao criar conta", description: msg, variant: "destructive" });
       } else {
-        fireNewUserWebhook({ name, email, plan: "free" });
+        fireNewUserWebhook({ name, email, whatsapp: rawWhatsapp, plan: "free" });
 
         navigate("/email-confirmation", { state: { email } });
       }
@@ -120,6 +127,24 @@ const SignUp = () => {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
+              className="h-9 text-sm"
+            />
+          </div>
+
+          {/* WhatsApp */}
+          <div className="space-y-1">
+            <Label htmlFor="whatsapp" className="text-xs">WhatsApp</Label>
+            <Input
+              id="whatsapp"
+              type="tel"
+              placeholder="+55 (11) 99999-9999"
+              value={whatsapp}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 13);
+                setWhatsapp(digits ? `+${digits}` : "");
+              }}
+              required
+              autoComplete="tel"
               className="h-9 text-sm"
             />
           </div>

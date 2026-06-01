@@ -34,25 +34,20 @@ const Welcome = () => {
   const [saving, setSaving] = useState(false);
 
   const rawWhatsapp = whatsapp.replace(/\D/g, "");
+  const whatsappValid = rawWhatsapp.length >= 10;
 
   const handleConfirm = async () => {
+    if (!whatsappValid) return;
     setSaving(true);
     try {
-      if (rawWhatsapp.length >= 10) {
-        await supabase.auth.updateUser({ data: { whatsapp: rawWhatsapp } });
-      }
-      fireNewUserWebhook({ name, email, whatsapp: rawWhatsapp.length >= 10 ? rawWhatsapp : null, plan: "free" });
+      await supabase.auth.updateUser({ data: { whatsapp: rawWhatsapp } });
+      fireNewUserWebhook({ name, email, whatsapp: rawWhatsapp, plan: "free" });
     } catch {
       // fire-and-forget — não bloqueia navegação
     } finally {
       setSaving(false);
       navigate("/dashboard");
     }
-  };
-
-  const handleSkip = () => {
-    fireNewUserWebhook({ name, email, whatsapp: null, plan: "free" });
-    navigate("/dashboard");
   };
 
   return (
@@ -115,7 +110,7 @@ const Welcome = () => {
           {fromGoogle && (
             <div className="space-y-2 text-left">
               <Label htmlFor="whatsapp" className="text-sm font-medium">
-                WhatsApp <span className="text-muted-foreground font-normal">(opcional)</span>
+                WhatsApp
               </Label>
               <Input
                 id="whatsapp"
@@ -126,7 +121,7 @@ const Welcome = () => {
                 className="h-9 text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Para receber suporte e novidades pelo WhatsApp.
+                Obrigatório para continuar. DDI + DDD + número.
               </p>
             </div>
           )}
@@ -134,27 +129,15 @@ const Welcome = () => {
           {/* CTAs */}
           <div className="space-y-3">
             {fromGoogle ? (
-              <>
-                <Button
-                  variant="hero"
-                  className="w-full"
-                  onClick={handleConfirm}
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : null}
-                  Confirmar e acessar o painel
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full text-sm text-muted-foreground"
-                  onClick={handleSkip}
-                  disabled={saving}
-                >
-                  Pular por agora →
-                </Button>
-              </>
+              <Button
+                variant="hero"
+                className="w-full"
+                onClick={handleConfirm}
+                disabled={saving || !whatsappValid}
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Confirmar e acessar o painel
+              </Button>
             ) : (
               <>
                 <Button
