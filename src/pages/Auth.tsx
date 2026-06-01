@@ -91,6 +91,19 @@ const Auth = () => {
           return;
         }
 
+        const { data: userCheck } = await supabase.functions.invoke("check-user-exists", {
+          body: { email },
+        });
+        if (userCheck?.exists) {
+          toast({
+            title: "Email já cadastrado",
+            description: "Este email já possui uma conta no Genius ADS. Faça login ou use a opção 'Esqueci minha senha'.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
         const { error } = await signUp(email, password, name, rawWhatsapp);
         if (error) {
           toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
