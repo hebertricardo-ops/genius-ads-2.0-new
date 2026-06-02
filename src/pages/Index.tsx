@@ -9,6 +9,7 @@ import {
   Brain, Target, Upload, PenTool, Layers, Quote,
   Check, X, Package, FileText, BarChart3
 } from "lucide-react";
+import { HeroCarousel } from "@/components/HeroCarousel";
 import { HowItWorksSection } from "@/components/HowItWorksSection";
 import { UseCasesSection } from "@/components/UseCasesSection";
 import { FeaturesPilarsSection } from "@/components/FeaturesPilarsSection";
@@ -110,27 +111,36 @@ const Index = () => {
 
   return (
     <div className="min-h-screen gradient-hero">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-border/50">
-        <div className="flex items-center gap-2">
-          <img src={logoText} alt="Genius ADS" className="h-16 text-xl object-fill" />
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/auth")}>
-            Entrar
-          </Button>
-          <Button variant="hero" size="sm" onClick={() => navigate("/signup")}>
-            Começar grátis
-          </Button>
-        </div>
-      </nav>
 
-      {/* DOBRA 1 — Hero */}
-      <section className="max-w-4xl mx-auto px-4 pt-20 pb-16 text-center">
-        <h1 className="text-4xl md:text-6xl font-display text-foreground leading-tight mb-6 animate-fade-in">
+      {/* ── DOBRA 1 — Hero com carrossel fullscreen ── */}
+      <div className="relative h-screen overflow-hidden">
+        {/* Camada 1: carrossel de fundo */}
+        <HeroCarousel />
+
+        {/* Camada 3: nav + conteúdo hero */}
+        <div className="relative z-10 flex flex-col h-full">
+          {/* Nav */}
+          <nav className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <img src={logoText} alt="Genius ADS" className="h-16 text-xl object-fill" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" className="text-white hover:text-white hover:bg-white/10" onClick={() => navigate("/auth")}>
+                Entrar
+              </Button>
+              <Button variant="hero" size="sm" onClick={() => navigate("/signup")}>
+                Começar grátis
+              </Button>
+            </div>
+          </nav>
+
+          {/* Hero content — ocupa o restante da altura */}
+          <section className="flex-1 flex items-center justify-center px-4 text-center">
+            <div className="max-w-4xl mx-auto">
+        <h1 className="text-4xl md:text-6xl font-display text-white leading-tight mb-6 animate-fade-in">
           Chega de travar na criação. Gere criativos completos com copy e imagem em menos de <span className="text-gradient">60 segundos</span>
         </h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10 animate-fade-in">
+        <p className="text-lg text-white/80 max-w-2xl mx-auto mb-10 animate-fade-in">
           Crie, agende e publique seus criativos direto pela plataforma — com copy estruturada para conversão e imagem profissional gerada pela IA em menos de 60 segundos.
         </p>
         <div className="flex items-center justify-center gap-4 mb-14 animate-fade-in">
@@ -138,7 +148,7 @@ const Index = () => {
             Começar agora
             <ArrowRight className="w-5 h-5" />
           </Button>
-          <Button variant="outline" size="lg" onClick={() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" })}>
+          <Button variant="outline" size="lg" className="border-white/40 text-white hover:bg-white/10 hover:text-white" onClick={() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" })}>
             Ver Planos
           </Button>
         </div>
@@ -171,8 +181,10 @@ const Index = () => {
             )}
           </div>
         </div>
-
-      </section>
+            </div>{/* /max-w-4xl */}
+          </section>
+        </div>{/* /flex col */}
+      </div>{/* /hero fullscreen */}
 
       {/* DOBRA 2 — Dor */}
       <section className="w-full bg-gradient-to-b from-zinc-600 to-zinc-950 py-20">
