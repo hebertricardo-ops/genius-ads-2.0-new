@@ -138,7 +138,7 @@ const Index = () => {
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10 animate-fade-in">
               Crie, agende e publique seus criativos direto pela plataforma — com copy estruturada para conversão e imagem profissional gerada pela IA em menos de 60 segundos.
             </p>
-            <div className="flex items-center justify-center gap-4 mb-14 animate-fade-in">
+            <div className="flex items-center justify-center gap-4 mb-6 animate-fade-in">
               <Button variant="hero" size="lg" onClick={() => navigate("/signup")}>
                 Começar agora
                 <ArrowRight className="w-5 h-5" />

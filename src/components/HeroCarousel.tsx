@@ -34,13 +34,12 @@ export function HeroCarousel() {
       }}
     >
       <div
-        className="flex"
-        style={{ animation: "hero-scroll 30s linear infinite" }}
+        className="flex hero-scroll"
       >
         {extendedSlides.map((src, idx) => (
           <div
             key={idx}
-            className="flex-shrink-0 px-1.5 w-1/2 md:w-1/3 lg:w-[calc(100%/6)]"
+            className="flex-shrink-0 px-1.5 w-[50vw] md:w-[25vw] lg:w-[calc(100vw/6)]"
           >
             <img
               src={src}

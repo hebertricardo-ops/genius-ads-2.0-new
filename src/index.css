@@ -76,6 +76,28 @@
   to   { transform: translateX(-50%); }
 }
 
+/* Mobile: 2 por view, item = 50vw, track = 20 × 50vw = 1000vw */
+.hero-scroll {
+  width: 1000vw;
+  animation: hero-scroll 30s linear infinite;
+}
+
+/* Tablet: 4 por view, item = 25vw, track = 20 × 25vw = 500vw */
+@media (min-width: 768px) {
+  .hero-scroll {
+    width: 500vw;
+    animation-duration: 20s;
+  }
+}
+
+/* Desktop: 6 por view, item = 100vw/6, track = 20 × 100vw/6 */
+@media (min-width: 1024px) {
+  .hero-scroll {
+    width: calc(2000vw / 6);
+    animation-duration: 30s;
+  }
+}
+
 @layer utilities {
   .gradient-primary {
     background: var(--gradient-primary);
