@@ -52,7 +52,6 @@ interface PrefillData {
   benefits: string;
   objections: string;
   cta: string;
-  quantity: number;
 }
 
 const BRAND_VISUAL_STYLE_MAP: Record<string, string> = {
@@ -86,7 +85,6 @@ const RegenerateCreative = () => {
   const [benefits, setBenefits] = useState(prefill?.benefits ?? "");
   const [objections, setObjections] = useState(prefill?.objections ?? "");
   const [cta, setCta] = useState(prefill?.cta ?? "");
-  const [quantity, setQuantity] = useState(prefill?.quantity ?? 1);
   const [additionalInstructions, setAdditionalInstructions] = useState("");
   const [creativeStyle, setCreativeStyle] = useState(
     selectedBrand?.visual_style ? (BRAND_VISUAL_STYLE_MAP[selectedBrand.visual_style] ?? "") : ""
@@ -170,7 +168,7 @@ const RegenerateCreative = () => {
 
   const handleGenerate = async () => {
     if (!user) return;
-    if ((credits?.credits_balance ?? 0) < quantity) {
+    if ((credits?.credits_balance ?? 0) < 10) {
       setIsCreditsDialogOpen(true);
       return;
     }
@@ -188,7 +186,6 @@ const RegenerateCreative = () => {
           benefits,
           objections: objections || null,
           cta: cta || null,
-          quantity,
           status: "processing",
         })
         .select()
@@ -378,7 +375,7 @@ const RegenerateCreative = () => {
       <InsufficientCreditsDialog
         open={isCreditsDialogOpen}
         onClose={() => setIsCreditsDialogOpen(false)}
-        creditsNeeded={quantity}
+        creditsNeeded={10}
         creditsAvailable={credits?.credits_balance ?? 0}
       />
 
@@ -422,22 +419,8 @@ const RegenerateCreative = () => {
                   <Sparkles className="w-4 h-4 text-primary" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quantidade</Label>
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4].map((n) => (
-                      <div
-                        key={n}
-                        className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all text-sm font-display ${
-                          quantity === n
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-background/50 text-muted-foreground hover:border-primary/40"
-                        }`}
-                        onClick={() => setQuantity(n)}
-                      >
-                        {n}
-                      </div>
-                    ))}
-                  </div>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Créditos</Label>
+                  <p className="text-sm text-muted-foreground">10 créditos por criativo</p>
                 </div>
               </div>
 
