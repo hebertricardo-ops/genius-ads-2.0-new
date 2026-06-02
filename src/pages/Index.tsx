@@ -112,79 +112,49 @@ const Index = () => {
   return (
     <div className="min-h-screen gradient-hero">
 
-      {/* ── DOBRA 1 — Hero com carrossel fullscreen ── */}
-      <div className="relative h-screen overflow-hidden">
-        {/* Camada 1: carrossel de fundo */}
-        <HeroCarousel />
-
-        {/* Camada 3: nav + conteúdo hero */}
-        <div className="relative z-10 flex flex-col h-full">
-          {/* Nav */}
-          <nav className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <img src={logoText} alt="Genius ADS" className="h-16 text-xl object-fill" />
-            </div>
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" className="text-white hover:text-white hover:bg-white/10" onClick={() => navigate("/auth")}>
-                Entrar
-              </Button>
-              <Button variant="hero" size="sm" onClick={() => navigate("/signup")}>
-                Começar grátis
-              </Button>
-            </div>
-          </nav>
-
-          {/* Hero content — ocupa o restante da altura */}
-          <section className="flex-1 flex items-center justify-center px-4 text-center">
-            <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl md:text-6xl font-display text-white leading-tight mb-6 animate-fade-in">
-          Chega de travar na criação. Gere criativos completos com copy e imagem em menos de <span className="text-gradient">60 segundos</span>
-        </h1>
-        <p className="text-lg text-white/80 max-w-2xl mx-auto mb-10 animate-fade-in">
-          Crie, agende e publique seus criativos direto pela plataforma — com copy estruturada para conversão e imagem profissional gerada pela IA em menos de 60 segundos.
-        </p>
-        <div className="flex items-center justify-center gap-4 mb-14 animate-fade-in">
-          <Button variant="hero" size="lg" onClick={() => navigate("/signup")}>
-            Começar agora
-            <ArrowRight className="w-5 h-5" />
-          </Button>
-          <Button variant="outline" size="lg" className="border-white/40 text-white hover:bg-white/10 hover:text-white" onClick={() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" })}>
-            Ver Planos
-          </Button>
-        </div>
-
-        {/* Video */}
-        <div className="max-w-3xl mx-auto mb-14 animate-fade-in">
-          <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl border border-border/50" style={{ paddingBottom: '56.25%' }}>
-            {!isVideoPlaying ? (
-              <div
-                className="absolute inset-0 cursor-pointer group"
-                onClick={() => setIsVideoPlaying(true)}
-              >
-                <img
-                  src="https://img.youtube.com/vi/XsivhOx4Q0Q/maxresdefault.jpg"
-                  alt="Genius ADS - Demo"
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
-                  <PlayCircle className="w-20 h-20 text-white drop-shadow-lg group-hover:scale-110 transition-transform" />
-                </div>
-              </div>
-            ) : (
-              <iframe
-                className="absolute inset-0 w-full h-full"
-                src="https://www.youtube.com/embed/XsivhOx4Q0Q?autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0"
-                title="Genius ADS - Demo"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            )}
+      {/* ── DOBRA 1 — Hero ── */}
+      <div>
+        {/* Nav */}
+        <nav className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <img src={logoText} alt="Genius ADS" className="h-16 text-xl object-fill" />
           </div>
-        </div>
-            </div>{/* /max-w-4xl */}
-          </section>
-        </div>{/* /flex col */}
-      </div>{/* /hero fullscreen */}
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" className="text-foreground hover:text-foreground hover:bg-foreground/10" onClick={() => navigate("/auth")}>
+              Entrar
+            </Button>
+            <Button variant="hero" size="sm" onClick={() => navigate("/signup")}>
+              Começar grátis
+            </Button>
+          </div>
+        </nav>
+
+        {/* Hero content */}
+        <section className="flex items-center justify-center px-4 py-16 text-center">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-4xl md:text-6xl font-display text-foreground leading-tight mb-6 animate-fade-in">
+              Chega de travar na criação. Gere criativos completos com copy e imagem em menos de <span className="text-gradient">60 segundos</span>
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10 animate-fade-in">
+              Crie, agende e publique seus criativos direto pela plataforma — com copy estruturada para conversão e imagem profissional gerada pela IA em menos de 60 segundos.
+            </p>
+            <div className="flex items-center justify-center gap-4 mb-14 animate-fade-in">
+              <Button variant="hero" size="lg" onClick={() => navigate("/signup")}>
+                Começar agora
+                <ArrowRight className="w-5 h-5" />
+              </Button>
+              <Button variant="outline" size="lg" className="border-foreground/30 text-foreground hover:bg-foreground/10 hover:text-foreground" onClick={() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" })}>
+                Ver Planos
+              </Button>
+            </div>
+
+
+          </div>
+        </section>
+
+        {/* Faixa de criativos deslizantes */}
+        <HeroCarousel />
+      </div>{/* /dobra 1 */}
 
       {/* DOBRA 2 — Dor */}
       <section className="w-full bg-gradient-to-b from-zinc-600 to-zinc-950 py-20">
