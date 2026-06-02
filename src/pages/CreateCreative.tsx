@@ -305,7 +305,6 @@ const CreateCreative = () => {
           benefits,
           objections: objections || null,
           cta: cta || null,
-          quantity,
           status: "processing",
         })
         .select()
