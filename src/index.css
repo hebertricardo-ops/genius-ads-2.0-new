@@ -71,6 +71,11 @@
   }
 }
 
+@keyframes progress-fill {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
 @keyframes hero-scroll {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }

@@ -47,7 +47,7 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <section className="w-full bg-white py-16">
+    <section className="w-full bg-background py-16">
       <div className="max-w-4xl mx-auto px-4">
       <h2 className="text-2xl md:text-3xl font-display text-foreground mb-12 text-center">
         Como funciona o <span className="text-gradient">Genius ADS</span>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Check } from "lucide-react";
 import imgCriadores from "@/assets/criador-de-conteudo.png";
 import imgInfoprodutores from "@/assets/infoprodutor.png";
@@ -104,12 +104,63 @@ const useCases: UseCase[] = [
   },
 ];
 
+const DURATION = 5000;
+
 export function UseCasesSection() {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startRef = useRef<number>(Date.now());
+  const remainingRef = useRef<number>(DURATION);
+
+  // Ref para a função de tick — sempre aponta para a versão mais recente
+  const tickRef = useRef<() => void>(() => {});
+
+  const scheduleNext = (ms: number) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    startRef.current = Date.now();
+    remainingRef.current = ms;
+    timerRef.current = setTimeout(() => {
+      tickRef.current();
+    }, ms);
+  };
+
+  // Atualiza tickRef a cada render para evitar stale closure
+  tickRef.current = () => {
+    setActiveIndex((prev) => (prev + 1) % useCases.length);
+    scheduleNext(DURATION);
+  };
+
+  // Inicia o timer na montagem
+  useEffect(() => {
+    scheduleNext(DURATION);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const handleTabClick = (i: number) => {
+    setActiveIndex(i);
+    scheduleNext(DURATION);
+  };
+
+  const handleMouseEnter = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const elapsed = Date.now() - startRef.current;
+    remainingRef.current = Math.max(100, remainingRef.current - elapsed);
+    setIsPaused(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsPaused(false);
+    scheduleNext(remainingRef.current);
+  };
+
   const active = useCases[activeIndex];
 
   return (
-    <section className="w-full py-20 bg-background">
+    <section className="w-full py-20 bg-white">
       <div className="max-w-5xl mx-auto px-4">
 
         {/* Título */}
@@ -125,14 +176,18 @@ export function UseCasesSection() {
         </div>
 
         {/* Tabs */}
-        <div className="flex justify-center mb-8">
+        <div
+          className="flex justify-center mb-8"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
           <div className="flex overflow-x-auto scrollbar-hide bg-zinc-200 border border-zinc-300 rounded-full p-1 gap-1">
             {useCases.map((uc, i) => (
               <button
                 key={uc.tab}
-                onClick={() => setActiveIndex(i)}
+                onClick={() => handleTabClick(i)}
                 className={`
-                  flex-shrink-0 px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 whitespace-nowrap
+                  relative flex-shrink-0 px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 whitespace-nowrap overflow-hidden
                   ${i === activeIndex
                     ? "bg-white text-zinc-900 shadow-sm"
                     : "bg-transparent text-zinc-500 hover:text-zinc-800"
@@ -140,6 +195,16 @@ export function UseCasesSection() {
                 `}
               >
                 {uc.tab}
+                {i === activeIndex && (
+                  <span
+                    key={activeIndex}
+                    className="absolute bottom-0 left-0 h-[2px] bg-primary"
+                    style={{
+                      animation: `progress-fill ${DURATION}ms linear forwards`,
+                      animationPlayState: isPaused ? "paused" : "running",
+                    }}
+                  />
+                )}
               </button>
             ))}
           </div>

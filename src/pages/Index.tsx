@@ -160,19 +160,17 @@ const Index = () => {
       <section className="w-full bg-gradient-to-b from-zinc-600 to-zinc-950 py-20">
       <div className="max-w-4xl mx-auto px-4">
         <h2 className="text-2xl md:text-3xl font-display text-white mb-10 text-center">
-          Você já <span className="text-gradient">pensou isso</span>?
+          Por que tanta gente começa a postar, some por semanas e <span className="text-gradient">recomeça do zero:</span>
         </h2>
         <div className="rounded-2xl p-8 md:p-12 border border-white/10 bg-white/5 backdrop-blur-sm shadow-card">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
             {[
-              "Eu não sei o que escrever no criativo…",
-              "Meu criativo nunca parece bom o suficiente",
-              "Demoro demais pra criar e no final nem sei se vai vender",
-              "Crio o criativo mas fico horas tentando publicar em cada rede separado",
-              "Vejo outros anunciando melhor que eu… mas não sei o que eles fazem",
-              "Fico travado olhando pra tela sem saber por onde começar",
-              "Testo um ou dois criativos e torço pra dar certo",
-              "Nunca consigo manter meu fluxo de postagem nas redes organizado",
+              "Quero postar todo dia mas nunca consigo criar conteúdo com consistência",
+              "Abro o Canva, fico uma hora editando e o resultado ainda parece amador",
+              "Tenho ideias mas na hora de transformar em criativo tudo trava",
+              "Crio um post hoje, sumo por duas semanas e perco tudo que construí",
+              "Não sei design e isso me impede de ter uma presença visual profissional",
+              "Gasto mais tempo criando do que fazendo o que realmente importa no meu negócio",
             ].map((quote) => (
               <div key={quote} className="flex items-start gap-3 p-4 rounded-xl bg-white/5 border border-white/10">
                 <Quote className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
@@ -185,10 +183,10 @@ const Index = () => {
               Se você já pensou isso…
             </p>
             <p className="text-lg text-primary font-display mt-1">
-              o problema não é seu produto ou serviço.
+              o problema não é falta de ideia.
             </p>
             <p className="text-zinc-400 mt-2">
-              É a forma como você está criando, gerenciando e publicando seus criativos.
+              É falta de um sistema que transforma sua ideia em criativo em segundos.
             </p>
           </div>
         </div>
@@ -198,17 +196,14 @@ const Index = () => {
       {/* DOBRA 3 — Transição Dor → Solução */}
       <section className="max-w-3xl mx-auto px-4 py-16 text-center">
         <h2 className="text-2xl md:text-3xl font-display text-foreground mb-10">
-          A culpa <span className="text-gradient">não é sua</span>
+          Não é falta de disciplina. É falta <span className="text-gradient">um sistema que trabalha por você</span>
         </h2>
         <div className="max-w-xl mx-auto mb-10 rounded-2xl border border-border bg-secondary/30 overflow-hidden">
           {[
-            "Você está criando tudo do zero, toda vez",
-            "Não tem estrutura pronta de copy",
-            "Não sabe quais dores usar",
-            "Falta padrão, só tentativa e erro",
-            "Criar criativo virou um processo lento",
-            "Quando finalmente cria, ainda perde tempo publicando em cada rede separado",
-            "E no fim, a frequência cai — e os resultados somem junto",
+            "Você recria tudo do zero toda vez — sem padrão, sem identidade salva",
+            "Não tem um padrão visual definido — cada criativo parece de uma marca diferente",
+            "Não sabe design e isso trava tudo antes mesmo de começar",
+            "A frequência cai, a presença some e você recomeça do zero semanas depois",
           ].map((item, i, arr) => (
             <div
               key={item}
@@ -223,7 +218,7 @@ const Index = () => {
         </div>
         <p className="text-muted-foreground mb-3">A verdade é simples:</p>
         <p className="text-xl font-display text-foreground mb-1">
-          Você não precisa ser criativo.
+          Você não precisa aprender design.
         </p>
         <p className="text-xl font-display text-foreground mb-4">
           Você precisa de um <span className="text-gradient">sistema que cria, organiza e publica por você.</span>
@@ -234,9 +229,9 @@ const Index = () => {
       </section>
 
       {/* DOBRA 4 — Passo a passo */}
-      <HowItWorksSection />
-
       <UseCasesSection />
+
+      <HowItWorksSection />
 
       {/* DOBRA 5 — O que você recebe */}
       <FeaturesPilarsSection />
