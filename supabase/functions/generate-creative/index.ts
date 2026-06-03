@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { ensureSupportedFormat } from "../_shared/image-utils.ts";
+import { calcFalCost, logCost } from "../_shared/cost-logger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -447,6 +448,22 @@ serve(async (req) => {
       console.log("Caption generated successfully");
     } catch (e) {
       console.error("Caption generation failed (non-fatal):", e);
+    }
+
+    // Registrar custo FAL.AI por imagem gerada
+    if (userId && uploadedUrls.length > 0) {
+      const promptStr = typeof prompt === "string" ? prompt : JSON.stringify(prompt);
+      await logCost(supabaseAdmin, {
+        user_id:          userId,
+        api_provider:     "fal_ai",
+        model:            "gpt-image-2",
+        operation:        "generate_creative",
+        images_count:     uploadedUrls.length,
+        image_size:       aspectRatio,
+        prompt_chars:     promptStr.length,
+        ref_images_count: allImageUrls.length,
+        cost_usd:         calcFalCost(aspectRatio) * uploadedUrls.length,
+      });
     }
 
     // Deduzir créditos APÓS sucesso (operação atômica — sem race condition)

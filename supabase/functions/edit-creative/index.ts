@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { calcFalCost, logCost } from "../_shared/cost-logger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -168,6 +169,19 @@ serve(async (req) => {
     const resultImageUrl = urlData.publicUrl;
 
     if (falRequestId) console.log(`[edit-creative] fal request_id: ${falRequestId}`);
+
+    // Registrar custo FAL.AI
+    await logCost(supabaseAdmin, {
+      user_id:          userId,
+      api_provider:     "fal_ai",
+      model:            "gpt-image-2",
+      operation:        "edit_creative",
+      images_count:     1,
+      image_size:       imageSize,
+      prompt_chars:     translatedPrompt.length,
+      ref_images_count: 1,
+      cost_usd:         calcFalCost(imageSize),
+    });
 
     // Atualizar registro com resultado
     await supabaseAdmin

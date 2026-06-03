@@ -1,6 +1,7 @@
 ﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { ensureSupportedFormat } from "../_shared/image-utils.ts";
+import { calcOpenAICost, calcFalCost, logCost } from "../_shared/cost-logger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -316,7 +317,7 @@ serve(async (req) => {
     const { phase } = body;
 
     if (phase === "copy") {
-      return await handleCopyPhase(body);
+      return await handleCopyPhase(body, authHeader);
     } else if (phase === "images") {
       return await handleImagesPhase(body, authHeader);
     } else if (phase === "single-image") {
@@ -336,9 +337,21 @@ serve(async (req) => {
 // ═══════════════════════════════════════════════════════
 // PHASE 1: Generate copy only (fast, ~5s)
 // ═══════════════════════════════════════════════════════
-async function handleCopyPhase(body: any) {
+async function handleCopyPhase(body: any, authHeader: string | null) {
   const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
   if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not configured");
+
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+  let userId: string | null = null;
+  if (authHeader) {
+    try {
+      const { data: { user } } = await supabaseAdmin.auth.getUser(authHeader.replace("Bearer ", ""));
+      userId = user?.id ?? null;
+    } catch { /* ignore */ }
+  }
 
   const { product_name, main_promise, pain_points, benefits, objections, carousel_objective, creative_style, extra_context, slides_count, cta } = body;
 
@@ -444,6 +457,20 @@ LEMBRETE CRÍTICO — INSTRUÇÃO INVIOLÁVEL: O CTA do slide final DEVE começa
   const carouselCopy = JSON.parse(toolCall.function.arguments);
   console.log("Copy generated:", carouselCopy.carousel_title, "-", carouselCopy.slides.length, "slides");
 
+  const usage = copyData.usage;
+  if (usage) {
+    await logCost(supabaseAdmin, {
+      user_id:           userId,
+      api_provider:      "openai",
+      model:             "gpt-4.1-mini",
+      operation:         "generate_carousel",
+      prompt_tokens:     usage.prompt_tokens,
+      completion_tokens: usage.completion_tokens,
+      total_tokens:      usage.total_tokens,
+      cost_usd:          calcOpenAICost(usage.prompt_tokens, usage.completion_tokens),
+    });
+  }
+
   return new Response(
     JSON.stringify({ copy: carouselCopy }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -539,6 +566,19 @@ async function handleImagesWithFal(
 
         if (falRequestId) console.log(`[fal.ai] request_id slide ${slide.slide_number}: ${falRequestId}`);
         generatedSlides.push({ slide_number: slide.slide_number, image_url: storageUrl, fal_request_id: falRequestId ?? null });
+
+        // Registrar custo FAL.AI por slide
+        await logCost(supabaseAdmin, {
+          user_id:          userId,
+          api_provider:     "fal_ai",
+          model:            "gpt-image-2",
+          operation:        "generate_carousel",
+          images_count:     1,
+          image_size:       "square_hd",
+          prompt_chars:     prompt.length,
+          ref_images_count: imageUrls.length,
+          cost_usd:         calcFalCost("square_hd"),
+        });
 
         if (userId) {
           const { error: insertError } = await supabaseAdmin
@@ -886,6 +926,19 @@ async function handleSingleImageWithFal(
       const storageUrl = await downloadAndUploadToStorage(falImageUrl, supabaseAdmin);
 
       if (falRequestId) console.log(`[fal.ai] request_id slide ${slide.slide_number}: ${falRequestId}`);
+
+      // Registrar custo FAL.AI para slide individual
+      await logCost(supabaseAdmin, {
+        user_id:          userId,
+        api_provider:     "fal_ai",
+        model:            "gpt-image-2",
+        operation:        "generate_carousel",
+        images_count:     1,
+        image_size:       "square_hd",
+        prompt_chars:     prompt.length,
+        ref_images_count: allRefUrls.length,
+        cost_usd:         calcFalCost("square_hd"),
+      });
 
       if (userId) {
         const { error: insertError } = await supabaseAdmin

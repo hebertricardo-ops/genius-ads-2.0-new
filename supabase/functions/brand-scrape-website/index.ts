@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { isSvgUrl, fetchImageBuffer, convertSvgToPng } from "../_shared/image-utils.ts";
+import { calcOpenAICost, logCost } from "../_shared/cost-logger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -301,6 +302,19 @@ serve(async (req) => {
         extracted = JSON.parse(cleaned);
       } catch {
         return errorResponse("Não foi possível analisar o conteúdo do site.", 422);
+      }
+      const usage = aiResult.value.usage;
+      if (usage) {
+        await logCost(supabaseAdmin, {
+          user_id:           userId,
+          api_provider:      "openai",
+          model:             "gpt-4.1-mini",
+          operation:         "brand_scrape",
+          prompt_tokens:     usage.prompt_tokens,
+          completion_tokens: usage.completion_tokens,
+          total_tokens:      usage.total_tokens,
+          cost_usd:          calcOpenAICost(usage.prompt_tokens, usage.completion_tokens),
+        });
       }
     } else {
       return errorResponse("Não foi possível analisar o conteúdo do site.", 422);

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { calcOpenAICost, logCost } from "../_shared/cost-logger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -184,6 +185,21 @@ Para campos que não for possível inferir, use null.`;
     }
 
     const openaiJson = await openaiRes.json();
+
+    const usage = openaiJson.usage;
+    if (usage) {
+      await logCost(supabaseAdmin, {
+        user_id:           user.id,
+        api_provider:      "openai",
+        model:             "gpt-4.1-mini",
+        operation:         "brand_scrape",
+        prompt_tokens:     usage.prompt_tokens,
+        completion_tokens: usage.completion_tokens,
+        total_tokens:      usage.total_tokens,
+        cost_usd:          calcOpenAICost(usage.prompt_tokens, usage.completion_tokens),
+      });
+    }
+
     const rawContent = openaiJson.choices?.[0]?.message?.content?.trim() ?? "";
 
     let extracted: Record<string, unknown>;

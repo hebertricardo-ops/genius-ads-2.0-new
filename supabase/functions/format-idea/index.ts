@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { calcOpenAICost, logCost } from "../_shared/cost-logger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +14,19 @@ serve(async (req) => {
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not configured");
+
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    let userId: string | null = null;
+    const authHeader = req.headers.get("authorization");
+    if (authHeader) {
+      try {
+        const { data: { user } } = await supabaseAdmin.auth.getUser(authHeader.replace("Bearer ", ""));
+        userId = user?.id ?? null;
+      } catch { /* ignore */ }
+    }
 
     const { idea, objective, product } = await req.json();
 
@@ -73,6 +88,20 @@ Ideia do usuário: ${idea}`;
       formatted = JSON.parse(cleaned);
     } catch {
       throw new Error("Resposta da IA não é JSON válido");
+    }
+
+    const usage = data.usage;
+    if (usage) {
+      await logCost(supabaseAdmin, {
+        user_id:           userId,
+        api_provider:      "openai",
+        model:             "gpt-4.1-mini",
+        operation:         "format_idea",
+        prompt_tokens:     usage.prompt_tokens,
+        completion_tokens: usage.completion_tokens,
+        total_tokens:      usage.total_tokens,
+        cost_usd:          calcOpenAICost(usage.prompt_tokens, usage.completion_tokens),
+      });
     }
 
     console.log("[format-idea] OK for product:", product);

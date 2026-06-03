@@ -1,4 +1,6 @@
 ﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { calcOpenAICost, logCost } from "../_shared/cost-logger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -121,7 +123,7 @@ async function callOpenAI(model: string, effectiveSystemPrompt: string, userProm
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) throw new Error("No tool call in response");
 
-    return { result: JSON.parse(toolCall.function.arguments) };
+    return { result: JSON.parse(toolCall.function.arguments), usage: data.usage };
   } catch (e) {
     clearTimeout(timeoutId);
     if (e.name === "AbortError") {
@@ -137,6 +139,19 @@ serve(async (req) => {
 
   try {
     const { product_name, promise, pains, benefits, objections, cta, creative_style, additional_instructions } = await req.json();
+
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    let userId: string | null = null;
+    const authHeader = req.headers.get("authorization");
+    if (authHeader) {
+      try {
+        const { data: { user } } = await supabaseAdmin.auth.getUser(authHeader.replace("Bearer ", ""));
+        userId = user?.id ?? null;
+      } catch { /* ignore */ }
+    }
 
     // Inject additional_instructions into system prompt as top-priority rule
     const effectiveSystemPrompt = additional_instructions
@@ -158,16 +173,32 @@ ${creative_style ? `Estilo visual desejado: ${creative_style}` : ""}
 ${additional_instructions ? `\n\nLEMBRETE FINAL: A instrução prioritária "${additional_instructions}" deve estar refletida em todos os elementos gerados.` : ""}\n\nLEMBRETE CRÍTICO — INSTRUÇÃO INVIOLÁVEL: O CTA de TODOS os ângulos DEVE começar obrigatoriamente com as palavras exatas: "${cta || "Compre agora"}". É PROIBIDO usar qualquer outro CTA que não inicie com essa frase. Complementos são permitidos após as palavras do CTA base, mas as palavras originais devem estar presentes e inalteradas.`;
 
     let response;
+    let usedModel = "gpt-4.1-mini";
     try {
       console.log("Attempting with gpt-4.1-mini...");
       response = await callOpenAI("gpt-4.1-mini", effectiveSystemPrompt, userPrompt, 90000);
     } catch (e) {
       if (e.message === "TIMEOUT") {
         console.log("Primary model timed out, retrying with gpt-4.1...");
+        usedModel = "gpt-4.1";
         response = await callOpenAI("gpt-4.1", effectiveSystemPrompt, userPrompt, 120000);
       } else {
         throw e;
       }
+    }
+
+    if (response.usage) {
+      const u = response.usage;
+      await logCost(supabaseAdmin, {
+        user_id:           userId,
+        api_provider:      "openai",
+        model:             usedModel,
+        operation:         "generate_copy",
+        prompt_tokens:     u.prompt_tokens,
+        completion_tokens: u.completion_tokens,
+        total_tokens:      u.total_tokens,
+        cost_usd:          calcOpenAICost(u.prompt_tokens, u.completion_tokens),
+      });
     }
 
     if (response.error) {
