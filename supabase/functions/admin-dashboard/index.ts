@@ -1,213 +1,200 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+const ADMIN_EMAIL = "hebertricardo@gmail.com";
+
+function json(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function getInterval(period: string): string {
+  const map: Record<string, string> = {
+    "24h": "24 hours",
+    "7d":  "7 days",
+    "30d": "30 days",
+    "all": "100 years",
+  };
+  return map[period] ?? "30 days";
+}
+
+function parsePeriodToMs(period: string): number {
+  const map: Record<string, number> = {
+    "24h": 24 * 60 * 60 * 1000,
+    "7d":  7  * 24 * 60 * 60 * 1000,
+    "30d": 30 * 24 * 60 * 60 * 1000,
+    "all": 365 * 24 * 60 * 60 * 1000,
+  };
+  return map[period] ?? map["30d"];
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Auth + admin check
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const jwt = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
+
+    if (authError || !user) return json({ error: "Não autenticado" }, 401);
+    if (user.email !== ADMIN_EMAIL) return json({ error: "Acesso não autorizado" }, 403);
+
+    const { section, period } = await req.json();
+    const interval = getInterval(period);
+
+    // OVERVIEW
+    if (section === "overview") {
+      const { data, error } = await supabaseAdmin.rpc("admin_overview", { p_interval: interval });
+      if (error) throw error;
+      return json({ overview: data });
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-    const supabaseUser = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    // USERS
+    if (section === "users") {
+      // profiles e subscriptions não têm FK direta — query separada
+      const [profilesRes, creditsRes, subsRes, authData] = await Promise.all([
+        supabaseAdmin
+          .from("profiles")
+          .select("user_id, name, email, whatsapp, created_at, is_admin")
+          .order("created_at", { ascending: false }),
+        supabaseAdmin
+          .from("user_credits")
+          .select("user_id, credits_balance, subscription_credits, extra_credits"),
+        supabaseAdmin
+          .from("subscriptions")
+          .select("user_id, status, plan_id, plans ( name, slug )"),
+        supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
+      ]);
 
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
-    if (userError || !user || user.email !== "hebertricardo@gmail.com") {
-      return new Response(JSON.stringify({ error: "Unauthorized - Admin only" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (profilesRes.error) throw profilesRes.error;
+
+      const authMap = new Map(
+        (authData.data?.users ?? []).map((u) => [u.id, {
+          email_confirmed_at: u.email_confirmed_at,
+          last_sign_in_at:    u.last_sign_in_at,
+        }])
+      );
+      const creditsMap = new Map(
+        (creditsRes.data ?? []).map((c) => [c.user_id, c])
+      );
+      const subsMap = new Map(
+        (subsRes.data ?? []).map((s) => [s.user_id, s])
+      );
+
+      const users = (profilesRes.data ?? []).map((p) => {
+        const auth = authMap.get(p.user_id) ?? {};
+        const uc   = creditsMap.get(p.user_id) ?? {};
+        const sub  = subsMap.get(p.user_id);
+        const activeSub = sub?.status === "active" ? sub : null;
+        const total = ((uc.subscription_credits ?? 0) + (uc.extra_credits ?? 0));
+        const avail = uc.credits_balance ?? 0;
+
+        return {
+          user_id:           p.user_id,
+          name:              p.name,
+          email:             p.email,
+          whatsapp:          p.whatsapp,
+          is_admin:          p.is_admin ?? false,
+          plan_name:         activeSub?.plans?.name ?? "Free",
+          plan_slug:         activeSub?.plans?.slug ?? "free",
+          total_credits:     total,
+          used_credits:      Math.max(0, total - avail),
+          available_credits: avail,
+          status:            auth.email_confirmed_at ? "ativo" : "pendente",
+          member_since:      p.created_at,
+          last_sign_in:      auth.last_sign_in_at ?? null,
+        };
       });
+
+      return json({ users });
     }
 
-    const { action, table_name } = await req.json();
+    // COSTS
+    if (section === "costs") {
+      const [summaryRes, byDayRes, byUserRes] = await Promise.all([
+        supabaseAdmin
+          .from("api_cost_log")
+          .select("api_provider, model, operation, cost_usd, total_tokens, images_count")
+          .gte("created_at", new Date(Date.now() - parsePeriodToMs(period)).toISOString()),
+        supabaseAdmin.rpc("admin_costs_by_day",  { p_interval: interval }),
+        supabaseAdmin.rpc("admin_costs_by_user", { p_interval: interval }),
+      ]);
 
-    if (action === "get_metadata") {
-      const knownTables = [
-        "profiles", "user_credits", "credit_transactions",
-        "creative_requests", "generated_creatives", "carousel_requests",
-        "email_send_log", "email_send_state", "email_unsubscribe_tokens",
-        "suppressed_emails"
-      ];
+      if (summaryRes.error) throw summaryRes.error;
+      if (byDayRes.error)   throw byDayRes.error;
+      if (byUserRes.error)  throw byUserRes.error;
 
-      const tableInfo = [];
-      for (const tableName of knownTables) {
-        const { count } = await supabaseAdmin
-          .from(tableName)
-          .select("*", { count: "exact", head: true });
-        tableInfo.push({ name: tableName, row_count: count ?? 0 });
-      }
-
-      const { data: buckets } = await supabaseAdmin.storage.listBuckets();
-
-      return new Response(JSON.stringify({
-        tables: tableInfo,
-        buckets: buckets || [],
-        connection: {
-          supabase_url: supabaseUrl,
-          anon_key: anonKey,
-          project_ref: supabaseUrl.replace("https://", "").replace(".supabase.co", ""),
-        },
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    if (action === "get_table_data") {
-      if (!table_name) {
-        return new Response(JSON.stringify({ error: "table_name required" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const { data, error } = await supabaseAdmin.from(table_name).select("*").limit(1000);
-      if (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ data: data || [] }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (action === "get_table_schema") {
-      if (!table_name) {
-        return new Response(JSON.stringify({ error: "table_name required" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const openApiRes = await fetch(`${supabaseUrl}/rest/v1/`, {
-        headers: {
-          "apikey": serviceRoleKey,
-          "Authorization": `Bearer ${serviceRoleKey}`,
-          "Accept": "application/openapi+json",
-        },
-      });
-      let columns: any[] = [];
-      try {
-        const openApi = await openApiRes.json();
-        const tableDef = openApi?.definitions?.[table_name];
-        if (tableDef?.properties) {
-          columns = Object.entries(tableDef.properties).map(([name, def]: [string, any]) => ({
-            name,
-            type: def.format || def.type || "unknown",
-            description: def.description || "",
-            default: def.default ?? null,
-          }));
+      // Agrega por provider/model/operation
+      const aggregate: Record<string, any> = {};
+      for (const row of (summaryRes.data ?? [])) {
+        const key = `${row.api_provider}|${row.model}|${row.operation}`;
+        if (!aggregate[key]) {
+          aggregate[key] = {
+            api_provider:  row.api_provider,
+            model:         row.model,
+            operation:     row.operation,
+            calls:         0,
+            cost_usd:      0,
+            total_tokens:  0,
+            images_count:  0,
+          };
         }
-      } catch {}
-      return new Response(JSON.stringify({ columns }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        aggregate[key].calls        += 1;
+        aggregate[key].cost_usd     += Number(row.cost_usd);
+        aggregate[key].total_tokens += Number(row.total_tokens ?? 0);
+        aggregate[key].images_count += Number(row.images_count ?? 0);
+      }
+
+      return json({
+        summary: Object.values(aggregate),
+        byDay:   byDayRes.data ?? [],
+        byUser:  byUserRes.data ?? [],
       });
     }
 
-    if (action === "get_storage_files") {
-      const bucket_name = table_name;
-      if (!bucket_name) {
-        return new Response(JSON.stringify({ error: "bucket name required" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const { data, error } = await supabaseAdmin.storage.from(bucket_name).list("", { limit: 100 });
-      return new Response(JSON.stringify({ files: data || [], error: error?.message }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // GENERATIONS
+    if (section === "generations") {
+      const [byUserRes, byDayRes] = await Promise.all([
+        supabaseAdmin.rpc("admin_generations_by_user"),
+        supabaseAdmin.rpc("admin_generations_by_day", { p_interval: interval }),
+      ]);
+
+      if (byUserRes.error) throw byUserRes.error;
+      if (byDayRes.error)  throw byDayRes.error;
+
+      return json({
+        byUser: byUserRes.data ?? [],
+        byDay:  byDayRes.data ?? [],
       });
     }
 
-    if (action === "get_function_code") {
-      const fnName = table_name;
-      if (!fnName) {
-        return new Response(JSON.stringify({ error: "function name required" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      try {
-        const possiblePaths = [
-          `/home/deno/functions/${fnName}/index.ts`,
-          `/home/deno/functions/${fnName}/index.js`,
-          `/var/task/functions/${fnName}/index.ts`,
-          `/tmp/functions/${fnName}/index.ts`,
-          `./functions/${fnName}/index.ts`,
-          `./${fnName}/index.ts`,
-          `../${fnName}/index.ts`,
-          `/src/functions/${fnName}/index.ts`,
-        ];
-        
-        let code = "";
-        let foundPath = "";
-        
-        // Try to discover the actual path
-        let debugInfo = "";
-        try {
-          const cwd = Deno.cwd();
-          debugInfo += `CWD: ${cwd}\n`;
-          try {
-            for await (const entry of Deno.readDir(cwd)) {
-              debugInfo += `  ${entry.name} (${entry.isDirectory ? 'dir' : 'file'})\n`;
-            }
-          } catch {}
-          try {
-            for await (const entry of Deno.readDir("/home/deno")) {
-              debugInfo += `  /home/deno/${entry.name} (${entry.isDirectory ? 'dir' : 'file'})\n`;
-            }
-          } catch (e) {
-            debugInfo += `  /home/deno: ${e.message}\n`;
-          }
-        } catch {}
-        
-        for (const p of possiblePaths) {
-          try {
-            code = await Deno.readTextFile(p);
-            foundPath = p;
-            break;
-          } catch { /* try next */ }
-        }
-        
-        if (!code) {
-          // Also try reading relative to import.meta.url
-          try {
-            const baseUrl = new URL(".", import.meta.url);
-            const siblingUrl = new URL(`../${fnName}/index.ts`, baseUrl);
-            const resp = await fetch(siblingUrl);
-            if (resp.ok) {
-              code = await resp.text();
-              foundPath = siblingUrl.toString();
-            }
-          } catch {}
-        }
-        
-        if (!code) {
-          code = `// Código não encontrado.\n// Debug:\n${debugInfo}`;
-        }
-        
-        return new Response(JSON.stringify({ code, path: foundPath }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    // FAL_USAGE
+    if (section === "fal_usage") {
+      const startDate = new Date(Date.now() - parsePeriodToMs(period)).toISOString();
+      const falRes = await fetch(
+        `https://api.fal.ai/v1/models/usage?endpoint_id=openai/gpt-image-2&start=${startDate}&expand=summary,time_series&timeframe=day`,
+        { headers: { Authorization: `Key ${Deno.env.get("FAL_KEY")}` } }
+      );
+      const falData = await falRes.json();
+      return json({ fal_official: falData });
     }
 
-    return new Response(JSON.stringify({ error: "Unknown action" }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: `Seção inválida: ${section}` }, 400);
+  } catch (e) {
+    console.error("[admin-dashboard] error:", e);
+    return json({ error: e instanceof Error ? e.message : "Erro interno" }, 500);
   }
 });
