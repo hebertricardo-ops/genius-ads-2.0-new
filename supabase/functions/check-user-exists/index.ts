@@ -23,7 +23,8 @@ serve(async (req) => {
       });
     }
 
-    const { email } = await req.json();
+    const body = await req.json();
+    const email = body.email?.trim().toLowerCase();
 
     if (!email) {
       return new Response(JSON.stringify({ error: "email é obrigatório" }), {
@@ -49,7 +50,7 @@ serve(async (req) => {
       });
       if (error) throw error;
 
-      const found = data?.users?.find((u) => u.email === email);
+      const found = data?.users?.find((u) => u.email?.toLowerCase() === email);
       if (found) {
         user = found;
         break;

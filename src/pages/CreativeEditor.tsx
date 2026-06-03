@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { sanitizeFileName } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useCreativeEditor, EditMessage, EditVersion } from "@/hooks/useCreativeEditor";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Send, Loader2, ZoomIn, ZoomOut, Sparkles, ImageIcon,
-  CheckCircle2, RotateCcw, History, Save,
+  CheckCircle2, RotateCcw, History, Save, X, Paperclip,
 } from "lucide-react";
 
 // ─── Element definitions ───────────────────────────────────────────────────
@@ -155,12 +156,18 @@ function ChatPanel({
   onSend,
   inputValue,
   setInputValue,
+  imagePreviewUrl,
+  onAttach,
+  onRemoveAttachment,
 }: {
   messages: EditMessage[];
   isLoading: boolean;
   onSend: () => void;
   inputValue: string;
   setInputValue: (v: string) => void;
+  imagePreviewUrl: string | null;
+  onAttach: () => void;
+  onRemoveAttachment: () => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -200,7 +207,7 @@ function ChatPanel({
               <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
               {msg.imageUrl && (
                 <div className="mt-2 rounded-lg overflow-hidden border border-white/10">
-                  <img src={msg.imageUrl} alt="Resultado" className="w-full h-auto object-contain" />
+                  <img src={msg.imageUrl} alt="Imagem" className="w-full h-auto object-contain" />
                 </div>
               )}
             </div>
@@ -221,7 +228,38 @@ function ChatPanel({
 
       {/* Input */}
       <div className="p-2.5 border-t border-border">
+        {/* Thumbnail da imagem anexada */}
+        {imagePreviewUrl && (
+          <div className="relative w-14 h-14 mb-2 shrink-0">
+            <img
+              src={imagePreviewUrl}
+              alt="Imagem anexada"
+              className="w-full h-full object-cover rounded-lg border border-border"
+            />
+            <button
+              type="button"
+              onClick={onRemoveAttachment}
+              className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive flex items-center justify-center shadow-sm"
+            >
+              <X className="w-2.5 h-2.5 text-white" />
+            </button>
+          </div>
+        )}
+
         <div className="flex gap-1.5 items-end">
+          {/* Botão de upload — abre seletor de arquivo */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+            onClick={onAttach}
+            disabled={isLoading}
+            title="Anexar imagem de referência"
+          >
+            <Paperclip className="w-3.5 h-3.5" />
+          </Button>
+
           <Textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -334,6 +372,33 @@ const CreativeEditor = () => {
   const [inputValue, setInputValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  // Anexo de imagem no chat
+  const [attachedImage, setAttachedImage] = useState<File | null>(null);
+  const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!attachedImage) { setAttachmentPreviewUrl(null); return; }
+    const url = URL.createObjectURL(attachedImage);
+    setAttachmentPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [attachedImage]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast({ title: "Formato inválido", description: "Use JPG, PNG ou WEBP.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Arquivo muito grande", description: "Máximo 10 MB.", variant: "destructive" });
+      return;
+    }
+    setAttachedImage(file);
+  };
+
   const handleSaveVersion = async () => {
     const currentVersion = versions[activeVersionIdx];
     if (!currentVersion || activeVersionIdx === 0 || !user) return;
@@ -382,13 +447,37 @@ const CreativeEditor = () => {
   const handleSend = async () => {
     if (!inputValue.trim() || !creativeId) return;
     const msg = inputValue;
+    const imageToSend = attachedImage;
     setInputValue("");
+    setAttachedImage(null);
+
+    let attachmentUrl: string | undefined;
+    if (imageToSend && user) {
+      try {
+        const path = `${user.id}/${Date.now()}-${sanitizeFileName(imageToSend.name)}`;
+        const { error: upErr } = await supabase.storage.from("creative-uploads").upload(path, imageToSend);
+        if (!upErr) {
+          const { data: signedData } = await supabase.storage
+            .from("creative-uploads")
+            .createSignedUrl(path, 600);
+          if (signedData?.signedUrl) {
+            attachmentUrl = signedData.signedUrl;
+            // TODO: passar reference_image_url no payload de edit-creative quando a Edge Function suportar o campo
+            console.log("[Editor] Imagem de referência capturada (integração com Edge Function pendente):", attachmentUrl);
+          }
+        }
+      } catch (err) {
+        console.error("[Editor] Erro ao fazer upload da imagem de referência:", err);
+      }
+    }
+
     await sendMessage({
       userMessage: msg,
       editElement: selectedElement,
       originalCreativeId: creativeId,
       brandId,
       format: creativeFormat,
+      attachmentUrl,
     });
   };
 
@@ -475,12 +564,23 @@ const CreativeEditor = () => {
 
         {/* Chat panel */}
         <div className="w-72 shrink-0 flex flex-col">
+          {/* Input oculto para seleção de arquivo */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
           <ChatPanel
             messages={messages}
             isLoading={isLoading}
             onSend={handleSend}
             inputValue={inputValue}
             setInputValue={setInputValue}
+            imagePreviewUrl={attachmentPreviewUrl}
+            onAttach={() => fileInputRef.current?.click()}
+            onRemoveAttachment={() => setAttachedImage(null)}
           />
         </div>
       </div>

@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { CheckCircle2, Zap, Image, Calendar, BarChart2, Mail, Loader2 } from "lucide-react";
 import logoIcon from "@/assets/logo-icon.png";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,13 +12,6 @@ const FEATURES = [
   { icon: BarChart2, text: "Acompanhe analytics do seu perfil" },
 ];
 
-const formatWhatsApp = (value: string) => {
-  const digits = value.replace(/\D/g, "").slice(0, 13);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
-  return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4)}`;
-};
-
 const Welcome = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,7 +20,6 @@ const Welcome = () => {
   const fromGoogle = !!state.fromGoogle;
   const name = state.name ?? "";
 
-  const [whatsapp, setWhatsapp] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -38,23 +28,13 @@ const Welcome = () => {
     }
   }, []);
 
-  const rawWhatsapp = whatsapp.replace(/\D/g, "");
-  const whatsappValid = rawWhatsapp.length >= 10;
-
   const handleConfirm = async () => {
-    if (!whatsappValid) return;
     setSaving(true);
-    try {
-      await supabase.auth.updateUser({ data: { whatsapp: rawWhatsapp } });
-      supabase.functions.invoke("notify-new-user", {
-        body: { name, email, whatsapp: rawWhatsapp },
-      }).catch((err) => console.error("Webhook error:", err));
-    } catch {
-      // fire-and-forget — não bloqueia navegação
-    } finally {
-      setSaving(false);
-      navigate("/dashboard");
-    }
+    // Notifica webhook sem whatsapp (campo removido do fluxo Google)
+    supabase.functions.invoke("notify-new-user", {
+      body: { name, email },
+    }).catch((err) => console.error("Webhook error:", err));
+    navigate("/dashboard");
   };
 
   return (
@@ -113,26 +93,6 @@ const Welcome = () => {
             </div>
           )}
 
-          {/* Campo WhatsApp — apenas para usuários Google */}
-          {fromGoogle && (
-            <div className="space-y-2 text-left">
-              <Label htmlFor="whatsapp" className="text-sm font-medium">
-                WhatsApp
-              </Label>
-              <Input
-                id="whatsapp"
-                type="tel"
-                placeholder="55 99 999999999"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(formatWhatsApp(e.target.value))}
-                className="h-9 text-sm"
-              />
-              <p className="text-xs text-muted-foreground">
-                Obrigatório para continuar. DDI + DDD + número.
-              </p>
-            </div>
-          )}
-
           {/* CTAs */}
           <div className="space-y-3">
             {fromGoogle ? (
@@ -140,10 +100,10 @@ const Welcome = () => {
                 variant="hero"
                 className="w-full"
                 onClick={handleConfirm}
-                disabled={saving || !whatsappValid}
+                disabled={saving}
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                Confirmar e acessar o painel
+                Acessar o painel
               </Button>
             ) : (
               <>
