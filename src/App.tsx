@@ -21,6 +21,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import ChangePassword from "./pages/ChangePassword";
 import AddCredits from "./pages/AddCredits";
 import Admin from "./pages/Admin";
+import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import EmailConfirmation from "./pages/EmailConfirmation";
 import Welcome from "./pages/Welcome";
@@ -74,7 +75,8 @@ const App = () => (
             <Route path="/regenerate" element={<ProtectedWithLayout><RegenerateCreative /></ProtectedWithLayout>} />
             <Route path="/add-credits" element={<ProtectedWithLayout><AddCredits /></ProtectedWithLayout>} />
             <Route path="/profile" element={<ProtectedWithLayout><Profile /></ProtectedWithLayout>} />
-            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/admin-legacy" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
             <Route path="/brands" element={<ProtectedWithLayout><BrandsManager /></ProtectedWithLayout>} />

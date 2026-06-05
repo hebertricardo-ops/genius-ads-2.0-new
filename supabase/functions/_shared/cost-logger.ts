@@ -15,8 +15,14 @@ const FAL_COST_MEDIUM: Record<string, number> = {
   "landscape_16_9": 0.053,
 };
 
+const TOKEN_OVERHEAD = 0.010;
+// Overhead empírico validado com dados reais:
+// portrait_4_3: $0.043 + $0.010 = $0.053 ≈ real $0.0536 (erro < 1%)
+// square_hd:    $0.061 + $0.010 = $0.071 ≈ real $0.0693 (erro ~2.5%)
+
 export function calcFalCost(imageSize: string): number {
-  return FAL_COST_MEDIUM[imageSize] ?? 0.061;
+  const imageCost = FAL_COST_MEDIUM[imageSize] ?? 0.061;
+  return imageCost + TOKEN_OVERHEAD;
 }
 
 // ─── Insert cost log (fire-and-forget safe) ───────────────────────────────────
