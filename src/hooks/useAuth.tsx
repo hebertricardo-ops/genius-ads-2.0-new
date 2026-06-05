@@ -43,17 +43,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [navigate]);
 
   const signUp = async (email: string, password: string, name: string, whatsapp?: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name, whatsapp },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
+    const { data, error } = await supabase.functions.invoke("signup-user", {
+      body: { email, password, name, whatsapp },
     });
-    // user null = e-mail já cadastrado (Supabase retorna sucesso silencioso com user: null)
-    const isNewUser = data?.user != null;
-    return { error: error as Error | null, isNewUser };
+    if (error) return { error: error as Error | null };
+    if (data?.error) return { error: new Error(data.error) };
+    return { error: null };
   };
 
   const signIn = async (email: string, password: string) => {

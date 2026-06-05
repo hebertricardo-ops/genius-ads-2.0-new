@@ -131,9 +131,6 @@ const Auth = () => {
           supabase.functions.invoke("notify-new-user", {
             body: { name, email, whatsapp: rawWhatsapp },
           }).catch((err) => console.error("Webhook error:", err));
-          supabase.functions.invoke("send-confirmation-email", {
-            body: { email, name },
-          }).catch((err) => console.error("Erro ao enviar email de confirmação:", err));
           navigate("/welcome", { state: { email } });
         }
       }
