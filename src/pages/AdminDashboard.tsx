@@ -1,14 +1,42 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdmin, AdminPeriod } from "@/hooks/useAdmin";
+import { useSortableTable } from "@/hooks/useSortableTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, RefreshCw, Users, DollarSign, Image, BarChart2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Users, DollarSign, Image, BarChart2, Tag } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
+
+// ─── SortableHeader ───────────────────────────────────────────────────────────
+
+const SortableHeader = ({
+  label, field, sortKey, sortDir, onSort,
+}: {
+  label:   string;
+  field:   string;
+  sortKey: string | null;
+  sortDir: "asc" | "desc" | null;
+  onSort:  (field: string) => void;
+}) => {
+  const isActive = sortKey === field;
+  return (
+    <th
+      className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide cursor-pointer hover:text-foreground select-none whitespace-nowrap"
+      onClick={() => onSort(field)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        <span className="text-[10px]">
+          {!isActive ? "↕" : sortDir === "asc" ? "↑" : "↓"}
+        </span>
+      </span>
+    </th>
+  );
+};
 
 // ─── KPI Cards ───────────────────────────────────────────────────────────────
 
@@ -93,6 +121,8 @@ const AdminUsersTab = ({ users, isLoading }: { users: any[]; isLoading: boolean 
     return matchSearch && matchPlan && matchStatus;
   });
 
+  const { sorted, sortKey, sortDir, handleSort } = useSortableTable(filtered);
+
   return (
     <div className="space-y-4">
       <div className="flex gap-3 flex-wrap items-center">
@@ -131,9 +161,15 @@ const AdminUsersTab = ({ users, isLoading }: { users: any[]; isLoading: boolean 
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
-              {["Nome","Email","WhatsApp","Plano","Total","Usado","Disponível","Status","Membro desde"].map((h) => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
-              ))}
+              <SortableHeader label="Nome"         field="name"              sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Email"        field="email"             sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="WhatsApp"     field="whatsapp"          sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Plano"        field="plan_name"         sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Total"        field="total_credits"     sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Usado"        field="used_credits"      sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Disponível"   field="available_credits" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Status"       field="status"            sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Membro desde" field="member_since"      sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
             </tr>
           </thead>
           <tbody>
@@ -145,7 +181,7 @@ const AdminUsersTab = ({ users, isLoading }: { users: any[]; isLoading: boolean 
                     ))}
                   </tr>
                 ))
-              : filtered.map((u: any) => (
+              : sorted.map((u: any) => (
                   <tr key={u.user_id} className="border-t border-border hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 font-medium whitespace-nowrap">{u.name ?? "—"}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{u.email}</td>
@@ -185,6 +221,9 @@ const AdminCostsTab = ({ costs, isLoading }: { costs: any; isLoading: boolean })
   const totalImgs   = (costs?.byUser ?? []).reduce((a: number, u: any) => a + Number(u.images_generated ?? 0), 0);
   const totalTokens = (costs?.byUser ?? []).reduce((a: number, u: any) => a + Number(u.tokens_used     ?? 0), 0);
 
+  const { sorted: sortedUsers, sortKey: cSortKey, sortDir: cSortDir, handleSort: cHandleSort } =
+    useSortableTable(costs?.byUser ?? []);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -217,9 +256,14 @@ const AdminCostsTab = ({ costs, isLoading }: { costs: any; isLoading: boolean })
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                {["Usuário","Email","Imagens","Tokens","OpenAI USD","FAL.AI USD","Total USD","Total BRL"].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
-                ))}
+                <SortableHeader label="Usuário"   field="name"             sortKey={cSortKey} sortDir={cSortDir} onSort={cHandleSort} />
+                <SortableHeader label="Email"     field="email"            sortKey={cSortKey} sortDir={cSortDir} onSort={cHandleSort} />
+                <SortableHeader label="Imagens"   field="images_generated" sortKey={cSortKey} sortDir={cSortDir} onSort={cHandleSort} />
+                <SortableHeader label="Tokens"    field="tokens_used"      sortKey={cSortKey} sortDir={cSortDir} onSort={cHandleSort} />
+                <SortableHeader label="OpenAI"    field="openai_cost_usd"  sortKey={cSortKey} sortDir={cSortDir} onSort={cHandleSort} />
+                <SortableHeader label="FAL.AI"    field="fal_cost_usd"     sortKey={cSortKey} sortDir={cSortDir} onSort={cHandleSort} />
+                <SortableHeader label="Total USD" field="total_cost_usd"   sortKey={cSortKey} sortDir={cSortDir} onSort={cHandleSort} />
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total BRL</th>
               </tr>
             </thead>
             <tbody>
@@ -231,7 +275,7 @@ const AdminCostsTab = ({ costs, isLoading }: { costs: any; isLoading: boolean })
                       ))}
                     </tr>
                   ))
-                : (costs?.byUser ?? []).map((u: any) => (
+                : sortedUsers.map((u: any) => (
                     <tr key={u.user_id} className="border-t border-border hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-medium whitespace-nowrap">{u.name ?? "—"}</td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{u.email}</td>
@@ -264,6 +308,9 @@ const AdminGenerationsTab = ({ generations, isLoading }: { generations: any; isL
       Editados:  Number(d.edited),
     }))
     .reverse();
+
+  const { sorted: sortedGen, sortKey: gSortKey, sortDir: gSortDir, handleSort: gHandleSort } =
+    useSortableTable(generations?.byUser ?? []);
 
   return (
     <div className="space-y-6">
@@ -302,9 +349,12 @@ const AdminGenerationsTab = ({ generations, isLoading }: { generations: any; isL
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                {["Usuário","Email","24h","7 dias","30 dias","Total"].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
-                ))}
+                <SortableHeader label="Usuário" field="name"     sortKey={gSortKey} sortDir={gSortDir} onSort={gHandleSort} />
+                <SortableHeader label="Email"   field="email"    sortKey={gSortKey} sortDir={gSortDir} onSort={gHandleSort} />
+                <SortableHeader label="24h"     field="last_24h" sortKey={gSortKey} sortDir={gSortDir} onSort={gHandleSort} />
+                <SortableHeader label="7 dias"  field="last_7d"  sortKey={gSortKey} sortDir={gSortDir} onSort={gHandleSort} />
+                <SortableHeader label="30 dias" field="last_30d" sortKey={gSortKey} sortDir={gSortDir} onSort={gHandleSort} />
+                <SortableHeader label="Total"   field="total"    sortKey={gSortKey} sortDir={gSortDir} onSort={gHandleSort} />
               </tr>
             </thead>
             <tbody>
@@ -316,7 +366,7 @@ const AdminGenerationsTab = ({ generations, isLoading }: { generations: any; isL
                       ))}
                     </tr>
                   ))
-                : (generations?.byUser ?? []).map((u: any) => (
+                : sortedGen.map((u: any) => (
                     <tr key={u.user_id} className="border-t border-border hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-medium whitespace-nowrap">{u.name ?? "—"}</td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{u.email}</td>
@@ -340,6 +390,160 @@ const AdminGenerationsTab = ({ generations, isLoading }: { generations: any; isL
   );
 };
 
+// ─── Brands Tab ───────────────────────────────────────────────────────────────
+
+const SOURCE_LABELS: Record<string, string> = {
+  manual:    "Manual",
+  website:   "Website",
+  instagram: "Instagram",
+};
+
+const SOURCE_COLORS: Record<string, string> = {
+  manual:    "bg-gray-100 text-gray-700",
+  website:   "bg-blue-100 text-blue-700",
+  instagram: "bg-pink-100 text-pink-700",
+};
+
+const AdminBrandsTab = ({ brands, isLoading }: { brands: any; isLoading: boolean }) => {
+  const [search, setSearch] = useState("");
+  const [view, setView]     = useState<"flat" | "by_user">("by_user");
+
+  const byUser = (brands?.by_user ?? []).filter((u: any) =>
+    !search ||
+    u.user_name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase()) ||
+    u.brands?.some((b: any) => b.name?.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const flat = (brands?.brands ?? []).filter((b: any) =>
+    !search ||
+    b.name?.toLowerCase().includes(search.toLowerCase()) ||
+    b.profiles?.name?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const { sorted: sortedBrands, sortKey: bSortKey, sortDir: bSortDir, handleSort: bHandleSort } =
+    useSortableTable(flat);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <Input
+            placeholder="Buscar marca ou usuário..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-xs"
+          />
+          <span className="text-sm text-muted-foreground">
+            {brands?.total ?? 0} marca{brands?.total !== 1 ? "s" : ""} no total
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant={view === "by_user" ? "default" : "outline"} onClick={() => setView("by_user")}>
+            Por usuário
+          </Button>
+          <Button size="sm" variant={view === "flat" ? "default" : "outline"} onClick={() => setView("flat")}>
+            Todas as marcas
+          </Button>
+        </div>
+      </div>
+
+      {/* View: Por usuário */}
+      {view === "by_user" && (
+        <div className="space-y-3">
+          {isLoading
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />
+              ))
+            : byUser.map((u: any) => (
+                <div key={u.user_id} className="border border-border rounded-xl overflow-hidden">
+                  <div className="bg-muted/40 px-4 py-3 flex items-center justify-between">
+                    <div>
+                      <span className="font-medium text-sm">{u.user_name}</span>
+                      <span className="text-xs text-muted-foreground ml-2">{u.email}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {u.brands.length} marca{u.brands.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {u.brands.map((b: any) => (
+                      <div key={b.id} className="px-4 py-2.5 flex items-center justify-between hover:bg-muted/20">
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium text-sm">{b.name}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${SOURCE_COLORS[b.source] ?? SOURCE_COLORS.manual}`}>
+                            {SOURCE_LABELS[b.source] ?? b.source}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${b.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                            {b.is_active ? "Ativa" : "Inativa"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(b.created_at).toLocaleDateString("pt-BR")}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+          }
+        </div>
+      )}
+
+      {/* View: Tabela flat */}
+      {view === "flat" && (
+        <div className="border border-border rounded-xl overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr>
+                <SortableHeader label="Marca"    field="name"       sortKey={bSortKey} sortDir={bSortDir} onSort={bHandleSort} />
+                <SortableHeader label="Origem"   field="source"     sortKey={bSortKey} sortDir={bSortDir} onSort={bHandleSort} />
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Usuário</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Email</th>
+                <SortableHeader label="Status"    field="is_active"  sortKey={bSortKey} sortDir={bSortDir} onSort={bHandleSort} />
+                <SortableHeader label="Criada em" field="created_at" sortKey={bSortKey} sortDir={bSortDir} onSort={bHandleSort} />
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="border-t border-border">
+                      {Array.from({ length: 6 }).map((_, j) => (
+                        <td key={j} className="px-4 py-3"><div className="h-4 bg-muted animate-pulse rounded" /></td>
+                      ))}
+                    </tr>
+                  ))
+                : sortedBrands.map((b: any) => (
+                    <tr key={b.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 font-medium">{b.name}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${SOURCE_COLORS[b.source] ?? SOURCE_COLORS.manual}`}>
+                          {SOURCE_LABELS[b.source] ?? b.source}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{b.profiles?.name ?? "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{b.profiles?.email ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${b.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                          {b.is_active ? "Ativa" : "Inativa"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">
+                        {new Date(b.created_at).toLocaleDateString("pt-BR")}
+                      </td>
+                    </tr>
+                  ))
+              }
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── AdminDashboard ───────────────────────────────────────────────────────────
 
 const AdminDashboard = () => {
@@ -350,6 +554,7 @@ const AdminDashboard = () => {
   const [users, setUsers]             = useState<any[]>([]);
   const [costs, setCosts]             = useState<any>(null);
   const [generations, setGenerations] = useState<any>(null);
+  const [brands, setBrands]           = useState<any>(null);
   const [isLoading, setIsLoading]     = useState(true);
   const [activeTab, setActiveTab]     = useState("users");
 
@@ -360,16 +565,18 @@ const AdminDashboard = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [ov, us, co, ge] = await Promise.all([
+      const [ov, us, co, ge, br] = await Promise.all([
         fetchSection("overview",    period),
         fetchSection("users",       period),
         fetchSection("costs",       period),
         fetchSection("generations", period),
+        fetchSection("brands",      period),
       ]);
       setOverview(ov?.overview ?? ov);
       setUsers(us?.users ?? []);
       setCosts(co);
       setGenerations(ge);
+      setBrands(br);
     } catch (err) {
       console.error("Erro ao carregar admin data:", err);
     } finally {
@@ -423,6 +630,9 @@ const AdminDashboard = () => {
             <TabsTrigger value="generations">
               <Image className="h-4 w-4 mr-2" /> Gerações
             </TabsTrigger>
+            <TabsTrigger value="brands">
+              <Tag className="h-4 w-4 mr-2" /> Marcas
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-4">
@@ -433,6 +643,9 @@ const AdminDashboard = () => {
           </TabsContent>
           <TabsContent value="generations" className="mt-4">
             <AdminGenerationsTab generations={generations} isLoading={isLoading} />
+          </TabsContent>
+          <TabsContent value="brands" className="mt-4">
+            <AdminBrandsTab brands={brands} isLoading={isLoading} />
           </TabsContent>
         </Tabs>
       </div>

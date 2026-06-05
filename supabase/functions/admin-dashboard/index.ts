@@ -181,6 +181,65 @@ serve(async (req) => {
       });
     }
 
+    // BRANDS
+    if (section === "brands") {
+      // Passo 1 — buscar todas as marcas
+      const { data: brands } = await supabaseAdmin
+        .from("brands")
+        .select("id, name, source, is_active, created_at, user_id")
+        .order("created_at", { ascending: false });
+
+      if (!brands?.length) {
+        return json({ brands: [], by_user: [], total: 0 });
+      }
+
+      // Passo 2 — buscar profiles dos user_ids únicos
+      const userIds = [...new Set(brands.map((b) => b.user_id))];
+
+      const { data: profiles } = await supabaseAdmin
+        .from("profiles")
+        .select("user_id, name, email")
+        .in("user_id", userIds);
+
+      const profileMap = new Map(
+        (profiles ?? []).map((p) => [p.user_id, p])
+      );
+
+      const enriched = brands.map((b) => ({
+        ...b,
+        user_name: profileMap.get(b.user_id)?.name  ?? "—",
+        email:     profileMap.get(b.user_id)?.email ?? "—",
+      }));
+
+      const byUserMap = enriched.reduce((acc: any, brand: any) => {
+        const uid = brand.user_id;
+        if (!acc[uid]) {
+          acc[uid] = {
+            user_id:   uid,
+            user_name: brand.user_name,
+            email:     brand.email,
+            brands:    [],
+            total:     0,
+          };
+        }
+        acc[uid].brands.push({
+          id:         brand.id,
+          name:       brand.name,
+          source:     brand.source,
+          is_active:  brand.is_active,
+          created_at: brand.created_at,
+        });
+        acc[uid].total++;
+        return acc;
+      }, {});
+
+      return json({
+        brands:  enriched,
+        by_user: Object.values(byUserMap),
+        total:   enriched.length,
+      });
+    }
+
     // FAL_USAGE
     if (section === "fal_usage") {
       const startDate = new Date(Date.now() - parsePeriodToMs(period)).toISOString();

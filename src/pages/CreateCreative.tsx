@@ -389,6 +389,29 @@ const CreateCreative = () => {
 
     setGeneratingCreative(true);
     try {
+      // Para method 'ideia': criar o creative_request antes de gerar a imagem
+      // (handleGenerate() nunca é chamado neste fluxo, então currentRequestId === null)
+      let requestId = currentRequestId;
+      if (method === "ideia" && !requestId) {
+        const { data: reqData, error: reqError } = await supabase
+          .from("creative_requests")
+          .insert({
+            user_id:      user.id,
+            product_name: productName,
+            promise:      formattedIdea!.promise || productName,
+            pains:        formattedIdea!.pains   || "",
+            benefits:     formattedIdea!.benefits || "",
+            objections:   objections || null,
+            cta:          cta       || null,
+            status:       "processing",
+          })
+          .select("id")
+          .single();
+        if (reqError) throw reqError;
+        requestId = reqData.id;
+        setCurrentRequestId(requestId);
+      }
+
       const imageUrls: string[] = [];
       for (const file of images) {
         const path = `${user.id}/${Date.now()}-${sanitizeFileName(file.name)}`;
@@ -450,7 +473,7 @@ const CreateCreative = () => {
           image_instructions: imageInstructions.length > 0 ? imageInstructions : undefined,
           model: imageModel,
           save_data: {
-            request_id: currentRequestId,
+            request_id: requestId,
             brand_id: selectedBrand?.id ?? null,
             copy_data: {
               angle_name: method === "ideia" ? "Ideia formatada" : angle!.angle_name,
@@ -478,9 +501,17 @@ const CreateCreative = () => {
       queryClient.invalidateQueries({ queryKey: ["credits"] });
       queryClient.invalidateQueries({ queryKey: ["creative-requests"] });
 
+      // Marcar request como concluído (para fluxo ideia que cria o registro aqui)
+      if (requestId) {
+        await supabase
+          .from("creative_requests")
+          .update({ status: "completed" })
+          .eq("id", requestId);
+      }
+
       toast({ title: "Criativo gerado!", description: "Seu criativo foi gerado com sucesso." });
-      if (currentRequestId) {
-        navigate(`/results/${currentRequestId}`);
+      if (requestId) {
+        navigate(`/results/${requestId}`);
       } else {
         navigate("/dashboard");
       }
