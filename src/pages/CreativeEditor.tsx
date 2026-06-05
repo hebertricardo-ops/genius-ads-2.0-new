@@ -462,8 +462,7 @@ const CreativeEditor = () => {
             .createSignedUrl(path, 600);
           if (signedData?.signedUrl) {
             attachmentUrl = signedData.signedUrl;
-            // TODO: passar reference_image_url no payload de edit-creative quando a Edge Function suportar o campo
-            console.log("[Editor] Imagem de referência capturada (integração com Edge Function pendente):", attachmentUrl);
+            console.log("[Editor] Imagem de referência pronta para envio:", attachmentUrl);
           }
         }
       } catch (err) {

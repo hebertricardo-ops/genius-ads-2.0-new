@@ -168,13 +168,14 @@ export function useCreativeEditor(
               Authorization: `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
-              original_creative_id: originalCreativeId,
-              parent_edit_id: parentEditId,
-              source_image_url: sourceImageUrl,
-              edit_element: editElement,
-              user_message: userMessage,
-              brand_id: brandId ?? null,
-              format: format ?? "1:1",
+              original_creative_id:  originalCreativeId,
+              parent_edit_id:        parentEditId,
+              source_image_url:      sourceImageUrl,
+              edit_element:          editElement,
+              user_message:          userMessage,
+              brand_id:              brandId ?? null,
+              format:                format ?? "1:1",
+              reference_image_url:   attachmentUrl ?? null,
             }),
           }
         );

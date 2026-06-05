@@ -92,7 +92,7 @@ const History = () => {
 
   const [selectedCreative, setSelectedCreative] = useState<CreativeItem | null>(null);
   const [selectedCarousel, setSelectedCarousel] = useState<{ requestId: string; slides: CreativeItem[] } | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: "creative" | "carousel"; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: "creative" | "carousel" | "edit_ia"; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // Caption editing
@@ -604,6 +604,16 @@ const History = () => {
   };
 
   const confirmDelete = (creative: CreativeItem) => {
+    // Criativos editados (source='edit_ia') não têm request_id — deletar pelo id direto
+    if ((creative as any).source === "edit_ia" || (!creative.request_id && !creative.carousel_request_id)) {
+      setDeleteTarget({
+        id:   creative.id,
+        type: "edit_ia",
+        name: (creative.copy_data as any)?.headline ?? (creative.copy_data as any)?.edit_label ?? "Criativo editado",
+      });
+      setSelectedCreative(null);
+      return;
+    }
     const info = getRequestInfo(creative);
     if (!info) return;
     setDeleteTarget({
@@ -624,7 +634,15 @@ const History = () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      if (deleteTarget.type === "creative") {
+      if (deleteTarget.type === "edit_ia") {
+        // Criativo editado — deletar diretamente pelo id (creative_edits em CASCADE)
+        const { error } = await supabase
+          .from("generated_creatives")
+          .delete()
+          .eq("id", deleteTarget.id)
+          .eq("user_id", user!.id);
+        if (error) throw error;
+      } else if (deleteTarget.type === "creative") {
         await supabase.from("generated_creatives").delete().eq("request_id", deleteTarget.id);
         const { error } = await supabase.from("creative_requests").delete().eq("id", deleteTarget.id);
         if (error) throw error;
@@ -918,6 +936,16 @@ const History = () => {
                     </Button>
                     <Button
                       size="sm"
+                      variant="outline"
+                      className="text-xs px-2.5 h-8"
+                      onClick={() => navigate(`/editor/${selectedCreative.id}`, {
+                        state: { imageUrl: selectedCreative.image_url, brandId: selectedCreative.brand_id },
+                      })}
+                    >
+                      <Pencil className="w-3 h-3" /> Editar com IA
+                    </Button>
+                    <Button
+                      size="sm"
                       variant="hero"
                       className="text-xs px-2.5 h-8"
                       onClick={() => openPostDialog(
@@ -946,7 +974,7 @@ const History = () => {
                         },
                       })}
                     >
-                      <CalendarDays className="w-3 h-3" /> Agendar Postagem
+                      <CalendarDays className="w-3 h-3" /> Agendar
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -955,11 +983,6 @@ const History = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => navigate(`/editor/${selectedCreative.id}`, {
-                          state: { imageUrl: selectedCreative.image_url, brandId: selectedCreative.brand_id },
-                        })}>
-                          <Pencil className="w-3.5 h-3.5 mr-2" /> Editar com IA
-                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setAdaptFormat("1:1"); setAdaptFormatOpen(true); }}>
                           <Maximize2 className="w-3.5 h-3.5 mr-2" /> Adaptar Formato
                         </DropdownMenuItem>

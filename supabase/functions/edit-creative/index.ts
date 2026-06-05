@@ -46,6 +46,7 @@ serve(async (req) => {
       user_message,
       brand_id,
       format,
+      reference_image_url,
     } = await req.json();
 
     if (!original_creative_id || !source_image_url || !user_message) {
@@ -87,11 +88,14 @@ serve(async (req) => {
     if (insertError) throw new Error(`Failed to create edit record: ${insertError.message}`);
     const editId = editRecord.id;
 
-    // Montar prompt para o fal.ai
+    // Montar prompt para o fal.ai — contextualiza quando há imagem de referência
     const elementContext = edit_element && edit_element !== "free"
       ? `Elemento a editar: ${edit_element}. `
       : "";
-    const translatedPrompt = `${elementContext}Instrução de edição: ${user_message}. Mantenha todos os demais elementos visuais inalterados. Preservar identidade visual, paleta de cores e composição geral do criativo original.`;
+
+    const translatedPrompt = reference_image_url
+      ? `${elementContext}Instrução de edição: ${user_message}. IMPORTANTE: Duas imagens são fornecidas — a PRIMEIRA é o criativo base a ser editado, a SEGUNDA é uma imagem de referência do usuário. Use a imagem de referência para guiar a edição conforme descrito. Mantenha todos os demais elementos visuais do criativo base inalterados. Preservar identidade visual, paleta de cores e composição geral do criativo original.`
+      : `${elementContext}Instrução de edição: ${user_message}. Mantenha todos os demais elementos visuais inalterados. Preservar identidade visual, paleta de cores e composição geral do criativo original.`;
 
     const FORMAT_TO_IMAGE_SIZE: Record<string, string> = {
       "1:1":  "square_hd",
@@ -101,10 +105,16 @@ serve(async (req) => {
     };
     const imageSize = FORMAT_TO_IMAGE_SIZE[format ?? "1:1"] ?? "square_hd";
 
-    // Chamar fal.ai — mesmo padrão do generate-creative
+    // Montar image_urls: sempre [criativo base] + [referência] se houver
+    const imageUrls = [source_image_url];
+    if (reference_image_url) {
+      imageUrls.push(reference_image_url);
+      console.log(`[edit-creative] Using reference image alongside source.`);
+    }
+
     const falPayload = {
       prompt:        translatedPrompt,
-      image_urls:    [source_image_url],
+      image_urls:    imageUrls,
       image_size:    imageSize,
       quality:       "medium",
       num_images:    1,
@@ -179,7 +189,7 @@ serve(async (req) => {
       images_count:     1,
       image_size:       imageSize,
       prompt_chars:     translatedPrompt.length,
-      ref_images_count: 1,
+      ref_images_count: imageUrls.length - 1,
       cost_usd:         calcFalCost(imageSize),
     });
 
