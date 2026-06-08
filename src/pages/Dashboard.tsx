@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Sparkles, ArrowRight, Lightbulb, ImageIcon, Building2, Images, CalendarDays, Plus, Clock, LayoutGrid } from "lucide-react";
+import { Sparkles, ArrowRight, Lightbulb, ImageIcon, Building2, CalendarDays, Plus, Clock, LayoutGrid } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,23 +44,25 @@ const Dashboard = () => {
     queryFn: async () => {
       let q = supabase
         .from("generated_creatives")
-        .select("*, creative_requests(product_name)")
+        .select("id, image_url, source, copy_data, credits_used, created_at, request_id, carousel_request_id, brand_id")
         .order("created_at", { ascending: false })
-        .limit(30);
+        .limit(50);
       if (selectedBrand) q = q.eq("brand_id", selectedBrand.id);
       const { data, error } = await q;
       if (error) throw error;
 
       const seenCarousels = new Set<string>();
       const deduped: any[] = [];
+      const MAX_ITEMS = 6;
+
       for (const item of data ?? []) {
-        if (!item.request_id && !item.carousel_request_id) continue;
+        if (deduped.length >= MAX_ITEMS) break;
+        if (!item.image_url) continue;
         if (item.carousel_request_id) {
           if (seenCarousels.has(item.carousel_request_id)) continue;
           seenCarousels.add(item.carousel_request_id);
         }
         deduped.push(item);
-        if (deduped.length === 6) break;
       }
       return deduped;
     },
@@ -167,55 +169,17 @@ const Dashboard = () => {
     },
   ];
 
-  const CreativeCard = ({ item, index }: { item: any; index: number }) => {
-    const productName = item.creative_requests?.product_name || "Criativo";
-    const isCarousel = !item.request_id && !!item.carousel_request_id;
-
-    const handleClick = () => {
-      if (item.request_id) {
-        navigate(`/results/${item.request_id}`);
-      } else if (item.carousel_request_id) {
-        navigate(`/carousel-results/${item.carousel_request_id}`);
-      }
-    };
-
-    return (
-      <div
-        className="group rounded-xl overflow-hidden border border-border shadow-card animate-fade-in cursor-pointer bg-secondary/30"
-        style={{ animationDelay: `${index * 80}ms` }}
-        onClick={handleClick}
-      >
-        <div className="aspect-square bg-black/40 flex items-center justify-center overflow-hidden">
-          <img
-            src={item.image_url}
-            alt={productName}
-            className="max-w-full max-h-full object-contain transition-transform duration-500 group-hover:scale-105"
-          />
-        </div>
-        <div className="p-3 flex flex-col gap-1 border-t border-border">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-foreground font-display text-sm font-medium truncate">
-              {productName}
-            </span>
-            {isCarousel && (
-              <span className="inline-flex items-center gap-1 shrink-0 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium">
-                <Images className="w-2.5 h-2.5" />
-                Carrossel
-              </span>
-            )}
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground text-xs">
-              {format(new Date(item.created_at), "dd/MM/yyyy")}
-            </span>
-            <span className="text-xs text-primary font-medium flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
-              {item.credits_used}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
+  const handleCreativeClick = (item: any) => {
+    if (item.carousel_request_id) {
+      navigate(`/carousel-results/${item.carousel_request_id}`);
+      return;
+    }
+    if (item.request_id) {
+      navigate(`/results/${item.request_id}`);
+      return;
+    }
+    // edit_ia ou criativo sem request_id → abrir biblioteca
+    navigate("/history");
   };
 
   return (
@@ -340,20 +304,73 @@ const Dashboard = () => {
             <>
               {/* Desktop: grid */}
               <div className="hidden sm:grid grid-cols-2 md:grid-cols-3 gap-4 p-6">
-                {recentCreatives.map((item: any, i: number) => (
-                  <CreativeCard key={item.id} item={item} index={i} />
-                ))}
+                {recentCreatives.map((item: any) => {
+                  const isEdit     = item.source === "edit_ia" || (item.copy_data as any)?.is_edit;
+                  const isCarousel = !!item.carousel_request_id;
+                  const isIdeia    = (item.copy_data as any)?.method === "ideia";
+                  const displayName = isEdit
+                    ? ((item.copy_data as any)?.edit_label ?? "Edição IA")
+                    : ((item.copy_data as any)?.headline ?? (item.copy_data as any)?.name ?? "Criativo");
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => handleCreativeClick(item)}
+                      className="group relative rounded-xl overflow-hidden cursor-pointer border border-border shadow-card hover:shadow-md transition-all hover:scale-[1.02]"
+                    >
+                      <img src={item.image_url} alt={displayName} className="w-full aspect-square object-cover" loading="lazy" />
+                      {isEdit && (
+                        <span className="absolute top-2 left-2 text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full font-medium">✨ Edição IA</span>
+                      )}
+                      {isCarousel && !isEdit && (
+                        <span className="absolute top-2 left-2 text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-medium">🎴 Carrossel</span>
+                      )}
+                      {isIdeia && !isEdit && !isCarousel && (
+                        <span className="absolute top-2 left-2 text-[10px] bg-teal-600 text-white px-2 py-0.5 rounded-full font-medium">💡 Ideia</span>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                        <p className="text-white text-xs font-medium truncate">{displayName}</p>
+                        <p className="text-white/70 text-[10px] mt-0.5">{format(new Date(item.created_at), "dd/MM/yy")}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Mobile: carrossel */}
               <div className="sm:hidden p-4">
                 <Carousel opts={{ align: "start", loop: true }} className="w-full">
                   <CarouselContent className="-ml-3">
-                    {recentCreatives.map((item: any, i: number) => (
-                      <CarouselItem key={item.id} className="pl-3 basis-[85%]">
-                        <CreativeCard item={item} index={i} />
-                      </CarouselItem>
-                    ))}
+                    {recentCreatives.map((item: any) => {
+                      const isEdit     = item.source === "edit_ia" || (item.copy_data as any)?.is_edit;
+                      const isCarousel = !!item.carousel_request_id;
+                      const isIdeia    = (item.copy_data as any)?.method === "ideia";
+                      const displayName = isEdit
+                        ? ((item.copy_data as any)?.edit_label ?? "Edição IA")
+                        : ((item.copy_data as any)?.headline ?? (item.copy_data as any)?.name ?? "Criativo");
+                      return (
+                        <CarouselItem key={item.id} className="pl-3 basis-[85%]">
+                          <div
+                            onClick={() => handleCreativeClick(item)}
+                            className="group relative rounded-xl overflow-hidden cursor-pointer border border-border shadow-card"
+                          >
+                            <img src={item.image_url} alt={displayName} className="w-full aspect-square object-cover" loading="lazy" />
+                            {isEdit && (
+                              <span className="absolute top-2 left-2 text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full font-medium">✨ Edição IA</span>
+                            )}
+                            {isCarousel && !isEdit && (
+                              <span className="absolute top-2 left-2 text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-medium">🎴 Carrossel</span>
+                            )}
+                            {isIdeia && !isEdit && !isCarousel && (
+                              <span className="absolute top-2 left-2 text-[10px] bg-teal-600 text-white px-2 py-0.5 rounded-full font-medium">💡 Ideia</span>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                              <p className="text-white text-xs font-medium truncate">{displayName}</p>
+                              <p className="text-white/70 text-[10px] mt-0.5">{format(new Date(item.created_at), "dd/MM/yy")}</p>
+                            </div>
+                          </div>
+                        </CarouselItem>
+                      );
+                    })}
                   </CarouselContent>
                   <CarouselPrevious className="-left-3 bg-background/80 border-border" />
                   <CarouselNext className="-right-3 bg-background/80 border-border" />

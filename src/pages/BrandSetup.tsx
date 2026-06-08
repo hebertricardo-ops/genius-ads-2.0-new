@@ -22,6 +22,7 @@ import {
 import { usePlan } from "@/hooks/usePlan";
 import { useBrandContext } from "@/contexts/BrandContext";
 import UpgradeDialog from "@/components/UpgradeDialog";
+import BrandExistsDialog from "@/components/BrandExistsDialog";
 
 const STEPS = ["Objetivo", "Dados Básicos", "Público-Alvo", "Estilo Visual", "Identidade", "Revisão"];
 
@@ -137,6 +138,8 @@ const BrandSetup = () => {
   // UI state
   const [saving, setSaving] = useState(false);
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
+  const [showBrandExists, setShowBrandExists] = useState(false);
+  const [takenBrandName, setTakenBrandName] = useState("");
 
   // ─── Fetch existing brand for edit mode ───────────────
   const db = supabase as any;
@@ -571,6 +574,12 @@ const BrandSetup = () => {
         navigate("/dashboard");
       }
     } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith("BRAND_NAME_TAKEN:")) {
+        const taken = err.message.replace("BRAND_NAME_TAKEN:", "");
+        setTakenBrandName(taken);
+        setShowBrandExists(true);
+        return;
+      }
       toast({
         title: isEditMode ? "Erro ao atualizar marca" : "Erro ao salvar marca",
         description: err instanceof Error ? err.message : "Tente novamente.",
@@ -1299,6 +1308,12 @@ const BrandSetup = () => {
   }
 
   return (
+    <>
+    <BrandExistsDialog
+      open={showBrandExists}
+      onClose={() => setShowBrandExists(false)}
+      brandName={takenBrandName}
+    />
     <div className="max-w-3xl mx-auto px-4 py-10">
       {/* Header */}
       <div className="mb-8 animate-fade-in">
@@ -1349,6 +1364,7 @@ const BrandSetup = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

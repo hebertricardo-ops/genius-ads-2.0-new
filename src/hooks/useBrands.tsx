@@ -107,6 +107,18 @@ export const useBrands = () => {
         throw err;
       }
 
+      // Verificar se o nome já existe para outro usuário (anti-abuse)
+      const { data: isAvailable, error: checkError } = await supabase.rpc(
+        "check_brand_name_available",
+        { p_name: data.name?.trim() ?? "", p_user_id: user!.id }
+      );
+      if (checkError) {
+        console.error("Erro ao verificar nome da marca:", checkError);
+        // Falha silenciosa — não bloquear cadastro por erro no check
+      } else if (isAvailable === false) {
+        throw new Error("BRAND_NAME_TAKEN:" + data.name);
+      }
+
       const { data: result, error } = await db
         .from("brands")
         .insert({ ...data, user_id: user!.id })
