@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -146,6 +148,7 @@ const Calendario = () => {
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<any | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -915,12 +918,32 @@ const Calendario = () => {
               {!form.publish_now && (
                 <div className="flex gap-2 mt-3">
                   <div className="flex-1">
-                    <Input
-                      type="date"
-                      value={form.scheduled_date}
-                      min={new Date().toISOString().split("T")[0]}
-                      onChange={(e) => setForm((f) => ({ ...f, scheduled_date: e.target.value }))}
-                    />
+                    <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={`w-full justify-start text-left font-normal${!form.scheduled_date ? " text-muted-foreground" : ""}`}
+                        >
+                          <CalendarDays className="w-4 h-4 mr-2 shrink-0" />
+                          {form.scheduled_date
+                            ? format(new Date(form.scheduled_date + "T00:00:00"), "dd/MM/yyyy")
+                            : "DD/MM/AAAA"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={form.scheduled_date ? new Date(form.scheduled_date + "T00:00:00") : undefined}
+                          onSelect={(d) => {
+                            setForm((f) => ({ ...f, scheduled_date: d ? format(d, "yyyy-MM-dd") : "" }));
+                            setCalendarOpen(false);
+                          }}
+                          disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                          locale={ptBR}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className="flex items-center gap-1 w-28">
                     <input

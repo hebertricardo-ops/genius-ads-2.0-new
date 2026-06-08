@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Loader2, Instagram, Facebook, CheckCircle2, CalendarDays, Send,
 } from "lucide-react";
@@ -59,7 +61,8 @@ const SocialPublishModal = ({
   );
   const [caption, setCaption] = useState(defaultCaption);
   const [mode, setMode] = useState<PublishMode>("now");
-  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [scheduleTime, setScheduleTime] = useState("12:00");
   const [publishing, setPublishing] = useState(false);
   const [success, setSuccess] = useState<SuccessResult | null>(null);
@@ -72,7 +75,10 @@ const SocialPublishModal = ({
 
   const scheduledForISO = useMemo(() => {
     if (mode !== "schedule" || !scheduleDate) return null;
-    return new Date(`${scheduleDate}T${scheduleTime}:00`).toISOString();
+    const d = new Date(scheduleDate);
+    const [h, m] = scheduleTime.split(":").map(Number);
+    d.setHours(h, m, 0, 0);
+    return d.toISOString();
   }, [mode, scheduleDate, scheduleTime]);
 
   const handlePublish = async () => {
@@ -89,7 +95,9 @@ const SocialPublishModal = ({
         toast({ title: "Informe a data de agendamento", variant: "destructive" });
         return;
       }
-      const scheduledDate = new Date(`${scheduleDate}T${scheduleTime}:00`);
+      const scheduledDate = new Date(scheduleDate);
+      const [h, m] = scheduleTime.split(":").map(Number);
+      scheduledDate.setHours(h, m, 0, 0);
       if (scheduledDate <= new Date()) {
         toast({ title: "A data de agendamento deve ser futura", variant: "destructive" });
         return;
@@ -134,7 +142,8 @@ const SocialPublishModal = ({
     setCaption(defaultCaption);
     setSelectedPlatforms(availablePlatforms.map((p) => p.value));
     setMode("now");
-    setScheduleDate("");
+    setScheduleDate(undefined);
+    setCalendarOpen(false);
     setScheduleTime("12:00");
     onClose();
   };
@@ -281,13 +290,32 @@ const SocialPublishModal = ({
 
             {mode === "schedule" && (
               <div className="flex gap-2 mt-3">
-                <Input
-                  type="date"
-                  value={scheduleDate}
-                  onChange={(e) => setScheduleDate(e.target.value)}
-                  min={new Date().toISOString().split("T")[0]}
-                  className="flex-1"
-                />
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "flex-1 justify-start text-left font-normal",
+                        !scheduleDate && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarDays className="w-4 h-4 mr-2 shrink-0" />
+                      {scheduleDate
+                        ? format(scheduleDate, "dd/MM/yyyy", { locale: ptBR })
+                        : "DD/MM/AAAA"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={scheduleDate}
+                      onSelect={(d) => { setScheduleDate(d); setCalendarOpen(false); }}
+                      disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                      locale={ptBR}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
                 <Input
                   type="time"
                   value={scheduleTime}
