@@ -65,6 +65,7 @@ function buildPrompt(data: {
     "manter design clean, premium e informativo",
     "garantir legibilidade em telas mobile",
     "priorizar contraste forte entre elementos principais e fundo",
+    "CONTROLE DE DENSIDADE VISUAL — CRÍTICO: o criativo deve conter exatamente 3 elementos textuais: headline (destaque principal), texto de desenvolvimento (subtítulo ou corpo curto com no máximo 1-2 frases objetivas) e CTA. Não adicionar mais elementos textuais além desses 3. Evitar acúmulo de ícones, badges, selos e elementos decorativos excessivos que não contribuam para a mensagem. O texto de desenvolvimento deve ser curto e legível — nunca um bloco de texto longo ou parágrafos. Usar espaço negativo (áreas vazias) como elemento de design — ele comunica sofisticação. O resultado final deve ter aparência de anúncio criado por designer humano experiente: limpo, hierárquico e com foco no produto. Menos elementos decorativos, mais impacto.",
     "usar as imagens de referência como elementos centrais da composição",
     "não adicionar texto renderizado na imagem; apenas compor o visual",
     "evitar poluição visual e manter acabamento profissional",
