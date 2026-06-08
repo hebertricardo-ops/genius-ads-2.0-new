@@ -34,7 +34,8 @@ interface UseCreativeEditorReturn {
     originalCreativeId: string;
     brandId?: string | null;
     format?: string;
-    attachmentUrl?: string; // URL da imagem de referência (apenas exibição no chat)
+    attachmentUrl?: string;
+    onNewVersion?: () => void;
   }) => Promise<void>;
   selectVersion: (idx: number) => void;
 }
@@ -133,6 +134,7 @@ export function useCreativeEditor(
       brandId,
       format,
       attachmentUrl,
+      onNewVersion,
     }: {
       userMessage: string;
       editElement: string;
@@ -140,6 +142,7 @@ export function useCreativeEditor(
       brandId?: string | null;
       format?: string;
       attachmentUrl?: string;
+      onNewVersion?: () => void;
     }) => {
       if (!user || !userMessage.trim()) return;
 
@@ -202,6 +205,7 @@ export function useCreativeEditor(
           return [...prev, newVersion];
         });
         setActiveVersionIdx((prev) => prev + 1);
+        onNewVersion?.();
 
         const assistantMsg: EditMessage = {
           role: "assistant",

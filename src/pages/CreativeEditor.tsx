@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Send, Loader2, ZoomIn, ZoomOut, Sparkles, ImageIcon,
-  CheckCircle2, RotateCcw, History, Save, X, Paperclip,
+  CheckCircle2, RotateCcw, History, Save, X, Paperclip, Check,
 } from "lucide-react";
 
 // ─── Element definitions ───────────────────────────────────────────────────
@@ -371,6 +371,7 @@ const CreativeEditor = () => {
 
   const [inputValue, setInputValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   // Anexo de imagem no chat
   const [attachedImage, setAttachedImage] = useState<File | null>(null);
@@ -429,6 +430,7 @@ const CreativeEditor = () => {
 
       if (error) throw error;
 
+      setIsSaved(true);
       toast({
         title: "Versão salva na sua biblioteca ✅",
         description: `${currentVersion.label} adicionada ao histórico.`,
@@ -477,6 +479,7 @@ const CreativeEditor = () => {
       brandId,
       format: creativeFormat,
       attachmentUrl,
+      onNewVersion: () => setIsSaved(false),
     });
   };
 
@@ -527,16 +530,19 @@ const CreativeEditor = () => {
           )}
           <Button
             onClick={handleSaveVersion}
-            disabled={isSaving || activeVersionIdx === 0}
-            className="gap-2"
+            disabled={isSaving || isSaved || activeVersionIdx === 0}
+            variant={isSaved ? "outline" : "default"}
+            className={isSaved ? "gap-2 text-green-600 border-green-300" : "gap-2"}
             size="sm"
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isSaved ? (
+              <Check className="h-4 w-4" />
             ) : (
               <Save className="h-4 w-4" />
             )}
-            Salvar Versão
+            {isSaving ? "Salvando..." : isSaved ? "Versão salva!" : "Salvar Versão"}
           </Button>
         </div>
       </div>
