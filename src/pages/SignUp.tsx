@@ -126,7 +126,7 @@ const SignUp = () => {
           Crie sua conta grátis
         </h1>
         <p className="text-xs text-muted-foreground text-center mb-5">
-          60 créditos para começar. Sem cartão de crédito.
+          40 créditos para começar. Sem cartão de crédito.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">

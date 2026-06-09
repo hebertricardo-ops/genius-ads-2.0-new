@@ -27,8 +27,8 @@ const SUBSCRIPTION_PLANS = [
     name: "Pro",
     slug: "pro",
     tagline: "Para quem quer criar criativos em escala",
-    monthlyPrice: 59.90,
-    annualPrice: 539.10,
+    monthlyPrice: 39.90,
+    annualPrice: 359.10,
     credits: 500,
     highlight: false,
     features: [
@@ -46,17 +46,16 @@ const SUBSCRIPTION_PLANS = [
     name: "Advanced",
     slug: "advanced",
     tagline: "Para agências e gestores que querem mais controle",
-    monthlyPrice: 99.90,
-    annualPrice: 899.16,
+    monthlyPrice: 59.90,
+    annualPrice: 539.10,
     credits: 1000,
     highlight: true,
     features: [
       "1000 créditos/mês",
       "Até 10 marcas",
-      "Conecte suas Redes Sociais (IG e FB)",
-      "Conecte até 02 perfis (para mais perfis, contrate pacote adicional)",
       "Calendário de postagens",
       "Agendamento de postagens ilimitados",
+      "Perfis sociais disponíveis como add-on",
       "Suporte via WhatsApp",
     ],
     cta: "Assinar Advanced",
@@ -67,17 +66,16 @@ const SUBSCRIPTION_PLANS = [
     name: "Social Media",
     slug: "social-media",
     tagline: "Para social media managers e agências full-service",
-    monthlyPrice: 199.90,
-    annualPrice: 1799.16,
+    monthlyPrice: 99.90,
+    annualPrice: 899.10,
     credits: 2000,
     highlight: false,
     features: [
       "2000 créditos/mês",
       "Marcas ilimitadas",
-      "Conecte suas Redes Sociais (IG e FB)",
-      "Conecte até 06 perfis (para mais perfis, contrate pacote adicional)",
       "Calendário de postagens",
       "Agendamento de postagens ilimitados",
+      "Perfis sociais disponíveis como add-on",
       "Suporte via WhatsApp",
     ],
     cta: "Assinar Social Media",
@@ -285,7 +283,7 @@ const Index = () => {
             </div>
             <div className="space-y-2 mb-6 flex-1">
               {[
-                "60 créditos para conhecer o Genius ADS",
+                "40 créditos para conhecer o Genius ADS",
                 "Até 2 marcas",
                 "Gere criativos e carrosséis",
               ].map((f) => (
@@ -426,7 +424,7 @@ const Index = () => {
           <h2 className="text-2xl md:text-3xl font-display text-foreground mb-4">
             Comece agora com o <span className="text-gradient">Genius ADS</span>
           </h2>
-          <p className="text-muted-foreground mb-2">🆓 Teste grátis com 60 créditos — sem cartão de crédito, sem compromisso</p>
+          <p className="text-muted-foreground mb-2">🆓 Teste grátis com 40 créditos — sem cartão de crédito, sem compromisso</p>
           <p className="text-muted-foreground mb-8">Crie até 6 criativos completos gratuitamente e veja o Genius ADS trabalhando por você.</p>
           <Button variant="hero" size="lg" onClick={() => navigate("/signup")}>
             COMECE AGORA GRÁTIS
@@ -465,7 +463,7 @@ const Index = () => {
             },
             {
               q: "Posso testar antes de assinar?",
-              a: "Sim. O plano Free oferece 60 créditos gratuitos — equivalente a 6 criativos completos — sem precisar de cartão de crédito. Você tem acesso a todas as funcionalidades da plataforma durante o teste.",
+              a: "Sim. O plano Free oferece 40 créditos gratuitos — equivalente a 4 criativos completos — sem precisar de cartão de crédito. Você tem acesso a todas as funcionalidades da plataforma durante o teste.",
             },
             {
               q: "Posso cancelar quando quiser?",

@@ -158,7 +158,7 @@ const Auth = () => {
             {isLogin ? "Entre na sua conta" : "Crie sua conta gratuita"}
           </h1>
           <p className="text-xs text-muted-foreground text-center mb-5">
-            {isLogin ? "Bem-vindo de volta ao Genius ADS" : "60 créditos para começar. Sem cartão de crédito."}
+            {isLogin ? "Bem-vindo de volta ao Genius ADS" : "40 créditos para começar. Sem cartão de crédito."}
           </p>
 
           {/* Botão Google */}

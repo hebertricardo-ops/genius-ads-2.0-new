@@ -198,7 +198,7 @@ export default function TermsOfUse() {
                 <div>
                   <p className="font-semibold text-foreground mb-2">Plano Free</p>
                   <div className="space-y-2">
-                    <p>6.1.1. O Genius ADS oferece um plano gratuito (Free) para novos USUÁRIOS, permitindo o acesso às funcionalidades da plataforma com um limite de 60 (sessenta) Créditos, equivalentes a até 6 (seis) gerações de criativos completos ou 1 (um) carrossel de até 6 slides.</p>
+                    <p>6.1.1. O Genius ADS oferece um plano gratuito (Free) para novos USUÁRIOS, permitindo o acesso às funcionalidades da plataforma com um limite de 40 (quarenta) Créditos, equivalentes a até 4 (quatro) gerações de criativos completos ou 1 (um) carrossel de até 4 slides.</p>
                     <p>6.1.2. O plano Free inclui acesso a até 2 (duas) marcas configuradas na plataforma, geração de criativos estáticos e carrosséis, dentro do limite de Créditos disponíveis.</p>
                     <p>6.1.3. Não há obrigação de contratar um plano pago após o uso dos créditos do plano Free. O USUÁRIO pode optar pela contratação de um plano pago para continuar utilizando a plataforma com volume maior de Créditos mensais.</p>
                   </div>
@@ -207,16 +207,16 @@ export default function TermsOfUse() {
                   <p className="font-semibold text-foreground mb-2">Plano PRO</p>
                   <div className="space-y-2">
                     <p>6.2.1. O Plano PRO oferece 500 (quinhentos) Créditos mensais, equivalentes a até 50 (cinquenta) criativos completos por mês.</p>
-                    <p>6.2.2. Plano mensal: cobrado e renovado automaticamente a cada mês pelo valor de R$ 59,90.</p>
-                    <p>6.2.3. Plano anual: cobrado pelo valor de R$ 539,10, equivalente a R$ 44,92 por mês, com renovação automática anual.</p>
+                    <p>6.2.2. Plano mensal: cobrado e renovado automaticamente a cada mês pelo valor de R$ 39,90.</p>
+                    <p>6.2.3. Plano anual: cobrado pelo valor de R$ 359,10, equivalente a R$ 39,90 por mês, com renovação automática anual.</p>
                   </div>
                 </div>
                 <div>
                   <p className="font-semibold text-foreground mb-2">Plano Advanced</p>
                   <div className="space-y-2">
                     <p>6.3.1. O Plano Advanced oferece 1.000 (mil) Créditos mensais, equivalentes a até 100 (cem) criativos completos por mês.</p>
-                    <p>6.3.2. Plano mensal: cobrado e renovado automaticamente a cada mês pelo valor de R$ 89,90.</p>
-                    <p>6.3.3. Plano anual: cobrado pelo valor de R$ 719,20, equivalente a R$ 59,93 por mês, com renovação automática anual.</p>
+                    <p>6.3.2. Plano mensal: cobrado e renovado automaticamente a cada mês pelo valor de R$ 59,90.</p>
+                    <p>6.3.3. Plano anual: cobrado pelo valor de R$ 539,10, equivalente a R$ 59,90 por mês, com renovação automática anual.</p>
                   </div>
                 </div>
                 <p>6.4. Ao se inscrever em um dos planos de assinatura, o USUÁRIO autoriza a cobrança automática do valor correspondente na data de renovação da assinatura, conforme o método de pagamento escolhido.</p>

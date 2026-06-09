@@ -4,7 +4,7 @@ const packages = [
   {
     name: "Básico",
     credits: 300,
-    price: "R$ 49,90",
+    price: "R$ 39,90",
     highlight: false,
     cta: "COMPRAR PACOTE BÁSICO",
     checkoutUrl: "https://pay.hotmart.com/V106013862G?off=neqe89bq&checkoutMode=10",
@@ -12,7 +12,7 @@ const packages = [
   {
     name: "Plus",
     credits: 500,
-    price: "R$ 79,90",
+    price: "R$ 59,90",
     highlight: true,
     cta: "COMPRAR PACOTE PLUS",
     checkoutUrl: "https://pay.hotmart.com/V106013862G?off=qilvstb0&checkoutMode=10",

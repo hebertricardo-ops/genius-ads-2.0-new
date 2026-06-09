@@ -47,14 +47,14 @@ const PLAN_CARDS = [
   {
     name: "Advanced",
     slug: "advanced",
-    price: "R$ 99,90/mês",
-    highlights: ["10 marcas", "Calendário editorial", "Publicação social", "2 perfis sociais"],
+    price: "R$ 59,90/mês",
+    highlights: ["10 marcas", "Calendário editorial", "Publicação social", "Perfis sociais como add-on"],
   },
   {
     name: "Social Media",
     slug: "social-media",
-    price: "R$ 199,90/mês",
-    highlights: ["Marcas ilimitadas", "Calendário editorial", "Publicação social", "6 perfis sociais"],
+    price: "R$ 99,90/mês",
+    highlights: ["Marcas ilimitadas", "Calendário editorial", "Publicação social", "Perfis sociais como add-on"],
     featured: true,
   },
 ];
