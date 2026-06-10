@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -62,11 +63,16 @@ interface SlideState {
 }
 
 interface FormattedIdea {
+  formatted_text?: string;
   promise: string;
   pains: string;
   benefits: string;
   angle: string;
-  summary: string;
+  summary?: string;
+  headline?: string;
+  subheadline?: string;
+  development?: string;
+  cta_suggestion?: string;
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -102,11 +108,10 @@ const CreateCarousel = () => {
     method?: "zero" | "ideia" | "link";
   };
 
-  // carousel_objective derived from objective selection
   const carouselObjective = objective === "engajamento" ? "engajar" : "vender diretamente";
 
   const STEPS =
-    method === "ideia" ? ["Produto", "Ideia", "Revisar", "Estratégia", "Criar"] :
+    method === "ideia" ? ["Produto", "Revisar", "Criar"] :
     method === "link"  ? ["Produto", "Link", "Criar"] :
                          ["Produto", "Persuasão", "Estratégia", "Criar"];
   const CRIAR_STEP = STEPS.length - 1;
@@ -148,6 +153,13 @@ const CreateCarousel = () => {
   const [linkScraped, setLinkScraped] = useState(false);
   const [isScraping, setIsScraping] = useState(false);
 
+  // Ideia-specific states
+  const [editableSlides, setEditableSlides] = useState<CarouselSlide[]>([]);
+  const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
+  const [refineSlideIdx, setRefineSlideIdx] = useState<number | null>(null);
+  const [refineSlideInstruction, setRefineSlideInstruction] = useState("");
+  const [isRefiningSlide, setIsRefiningSlide] = useState(false);
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -181,6 +193,8 @@ const CreateCarousel = () => {
     if (selectedBrand.generated_promise) {
       setMainPromise(selectedBrand.generated_promise);
       filled.add("mainPromise");
+    } else if (method === "ideia" && selectedBrand.description) {
+      setMainPromise(selectedBrand.description);
     }
 
     if (selectedBrand.tone_of_voice?.length || selectedBrand.audience_interests?.length) {
@@ -220,17 +234,10 @@ const CreateCarousel = () => {
     generate();
   }, [selectedBrand?.id]);
 
-  // ── Auto-trigger copy generation at Criar step ────────────────────────────
+  // ── Auto-trigger copy generation at Criar step (zero / link) ─────────────
   useEffect(() => {
     if (step === CRIAR_STEP && !generatedCopy && !loadingCopy) {
       handleGenerateCopy();
-    }
-  }, [step]);
-
-  // ── Auto-format idea when entering review step ────────────────────────────
-  useEffect(() => {
-    if (method === "ideia" && step === 2 && !formattedIdea && !formattingIdea) {
-      handleFormatIdea();
     }
   }, [step]);
 
@@ -247,16 +254,14 @@ const CreateCarousel = () => {
       switch (step) {
         case 0: return !!productName.trim() && !!mainPromise.trim();
         case 1: return !!painPoints.trim() && !!benefits.trim();
-        case 2: return true; // Estratégia — all optional
+        case 2: return true;
         default: return false;
       }
     }
     if (method === "ideia") {
       switch (step) {
-        case 0: return !!productName.trim() && !!mainPromise.trim();
-        case 1: return idea.trim().length > 0;
-        case 2: return !!formattedIdea;
-        case 3: return true; // Estratégia
+        case 0: return !!idea.trim() && slidesCount > 0;
+        case 1: return editableSlides.length > 0;
         default: return false;
       }
     }
@@ -270,27 +275,154 @@ const CreateCarousel = () => {
     return false;
   };
 
-  // ── handleFormatIdea ──────────────────────────────────────────────────────
-  const handleFormatIdea = async () => {
-    setFormattingIdea(true);
+  // ── handleAdvanceFromStep0Ideia ───────────────────────────────────────────
+  const handleAdvanceFromStep0Ideia = async () => {
+    if (!user) return;
+    setIsGeneratingBrief(true);
     try {
-      const { data, error } = await supabase.functions.invoke("format-idea", {
-        body: { idea, objective, product: productName },
+      // 1. Format idea
+      const { data: fData, error: fErr } = await supabase.functions.invoke("format-idea", {
+        body: {
+          idea,
+          objective,
+          product: productName || selectedBrand?.name,
+          cta: carouselCta || undefined,
+          brand_context: selectedBrand
+            ? { name: selectedBrand.name, description: selectedBrand.description }
+            : undefined,
+        },
       });
-      if (error) throw error;
-      if (!data?.formatted) throw new Error("Resposta inválida da IA");
+      if (fErr) throw fErr;
+      if (!fData?.formatted) throw new Error("Resposta inválida da IA");
 
-      const f: FormattedIdea = data.formatted;
+      const f: FormattedIdea = fData.formatted;
       setFormattedIdea(f);
+
+      const extractedPromise = f.promise || mainPromise;
+      const extractedPains = f.pains || painPoints;
+      const extractedBenefits = f.benefits || benefits;
 
       if (f.promise) { setMainPromise(f.promise); setBrandFilledFields((p) => new Set([...p, "mainPromise"])); }
       if (f.pains)   { setPainPoints(f.pains);    setBrandFilledFields((p) => new Set([...p, "painPoints"])); }
       if (f.benefits){ setBenefits(f.benefits);    setBrandFilledFields((p) => new Set([...p, "benefits"])); }
-    } catch (err: any) {
-      toast({ title: "Erro ao formatar ideia", description: err.message, variant: "destructive" });
+
+      // 2. Check credits
+      const creditsNeeded = slidesCount * CREDITS_PER_SLIDE;
+      if ((credits?.credits_balance ?? 0) < creditsNeeded) {
+        setIsCreditsDialogOpen(true);
+        return;
+      }
+
+      // 3. Generate copy
+      await supabase.auth.getSession();
+      const { data: copyData, error: copyErr } = await supabase.functions.invoke("generate-carousel", {
+        body: {
+          phase: "copy",
+          product_name: productName || selectedBrand?.name || "",
+          main_promise: extractedPromise,
+          pain_points: extractedPains,
+          benefits: extractedBenefits,
+          objections: objections || null,
+          carousel_objective: carouselObjective,
+          creative_style: creativeStyle || null,
+          extra_context: extraContext || null,
+          cta: carouselCta || null,
+          slides_count: slidesCount,
+          formatted_text: f.formatted_text || null,
+        },
+      });
+      if (copyErr) throw copyErr;
+
+      const copy: CarouselCopy = copyData.copy;
+      setGeneratedCopy(copy);
+      setEditableSlides(copy.slides.map((s) => ({ ...s })));
+      setSlideStates(copy.slides.map(() => ({ loading: false, imageUrl: null, extraImages: [], imageInstruction: "", useAiImage: true })));
+
+      // 4. Upload reference images
+      const imageUrls: string[] = [];
+      for (const file of images) {
+        const path = `${user.id}/${Date.now()}-${sanitizeFileName(file.name)}`;
+        const { error: upErr } = await supabase.storage.from("creative-uploads").upload(path, file);
+        if (upErr) throw upErr;
+        const { data: signedUrlData, error: signedUrlErr } = await supabase.storage
+          .from("creative-uploads")
+          .createSignedUrl(path, 3600);
+        if (signedUrlErr || !signedUrlData?.signedUrl) throw new Error("Failed to create signed URL");
+        imageUrls.push(signedUrlData.signedUrl);
+      }
+      setUploadedImageUrls(imageUrls);
+
+      // 5. Create carousel_request
+      const visualContext = {
+        creative_style: creativeStyle || null,
+        image_urls: imageUrls,
+        product_name: productName || selectedBrand?.name || "",
+        carousel_style_reference: creativeStyle || "clean premium tecnológico",
+        typography_style: "sans-serif geométrica (Montserrat ou similar)",
+      };
+
+      const { data: request, error: reqError } = await supabase
+        .from("carousel_requests")
+        .insert({
+          user_id: user.id,
+          product_name: productName || selectedBrand?.name || "",
+          main_promise: extractedPromise,
+          pain_points: extractedPains,
+          benefits: extractedBenefits,
+          objections: objections || null,
+          carousel_objective: carouselObjective,
+          creative_style: creativeStyle || null,
+          extra_context: extraContext || null,
+          slides_count: copy.slides.length,
+          status: "pending",
+          result_data: copy as any,
+          visual_context: visualContext as any,
+        })
+        .select()
+        .single();
+      if (reqError) throw reqError;
+      setRequestId(request.id);
+
       setStep(1);
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Erro ao gerar briefing", description: err.message || "Tente novamente.", variant: "destructive" });
     } finally {
-      setFormattingIdea(false);
+      setIsGeneratingBrief(false);
+    }
+  };
+
+  // ── handleRefineSlide ─────────────────────────────────────────────────────
+  const handleRefineSlide = async () => {
+    if (refineSlideIdx === null) return;
+    setIsRefiningSlide(true);
+    try {
+      const currentSlide = editableSlides[refineSlideIdx];
+      const { data, error } = await supabase.functions.invoke("refine-carousel-slide", {
+        body: {
+          slide: currentSlide,
+          instruction: refineSlideInstruction,
+          product_name: selectedBrand?.name ?? productName,
+          objective,
+        },
+      });
+      if (error) throw error;
+      if (!data?.slide) throw new Error("Resposta inválida");
+
+      const updated = [...editableSlides];
+      updated[refineSlideIdx] = {
+        ...updated[refineSlideIdx],
+        headline: data.slide.headline ?? updated[refineSlideIdx].headline,
+        subtext:  data.slide.subtext  ?? updated[refineSlideIdx].subtext,
+        cta:      data.slide.cta,
+      };
+      setEditableSlides(updated);
+      setRefineSlideIdx(null);
+      setRefineSlideInstruction("");
+    } catch (err: any) {
+      toast({ title: "Erro ao refinar slide", description: err.message, variant: "destructive" });
+    } finally {
+      setIsRefiningSlide(false);
     }
   };
 
@@ -319,7 +451,7 @@ const CreateCarousel = () => {
     }
   };
 
-  // ── handleGenerateCopy ────────────────────────────────────────────────────
+  // ── handleGenerateCopy (zero / link) ──────────────────────────────────────
   const handleGenerateCopy = async () => {
     if (!user) return;
 
@@ -435,7 +567,9 @@ const CreateCarousel = () => {
     setSlideStates((prev) => prev.map((s, i) => i === slideIndex ? { ...s, loading: true } : s));
 
     try {
-      const slide = generatedCopy.slides[slideIndex];
+      const slide = method === "ideia" && editableSlides.length > 0
+        ? editableSlides[slideIndex]
+        : generatedCopy.slides[slideIndex];
       const slideState = slideStates[slideIndex];
       const totalSlides = generatedCopy.slides.length;
 
@@ -564,6 +698,8 @@ const CreateCarousel = () => {
   const handleGenerateAllSlides = async () => {
     if (!user || !generatedCopy) return;
 
+    const slidesSource = method === "ideia" && editableSlides.length > 0 ? editableSlides : generatedCopy.slides;
+
     const snapshot = [...slideStates];
     const toGenerate = snapshot
       .map((s, idx) => ({ idx, state: s }))
@@ -593,7 +729,8 @@ const CreateCarousel = () => {
     const collectedUrls: (string | null)[] = new Array(totalSlides).fill(null);
 
     const generateSlide = async (idx: number, state: SlideState): Promise<string | null> => {
-      const slideNum = generatedCopy.slides[idx].slide_number;
+      const slide = slidesSource[idx];
+      const slideNum = slide.slide_number;
       setSlideStates((prev) => prev.map((s, i) => i === idx ? { ...s, loading: true } : s));
       try {
         setGenStatusMessage(`Slide ${slideNum} — preparando referências...`);
@@ -610,7 +747,6 @@ const CreateCarousel = () => {
         }
 
         const allImageUrls = [...uploadedImageUrls, ...extraImageUrls];
-        const slide = generatedCopy.slides[idx];
         const includeLogoVisible = slide.slide_number !== 1 && slide.slide_number !== totalSlides;
 
         setGenStatusMessage(`Slide ${slideNum} — gerando imagem com IA...`);
@@ -702,7 +838,7 @@ const CreateCarousel = () => {
   const generatedCount = slideStates.filter((s) => s.imageUrl).length;
   const allSlidesGenerated = generatedCopy && generatedCount === generatedCopy.slides.length;
 
-  // ── Estratégia step content (shared) ─────────────────────────────────────
+  // ── Estratégia step content (shared for zero) ─────────────────────────────
   const estrategiaStepContent = (
     <div className="space-y-6">
       <div className="space-y-3">
@@ -799,7 +935,7 @@ const CreateCarousel = () => {
         {step < CRIAR_STEP && (
           <div className="gradient-card rounded-2xl p-8 border border-border shadow-card animate-fade-in">
 
-            {/* ── Step 0 — Produto (all methods) ── */}
+            {/* ── Step 0 — Produto ── */}
             {step === 0 && (
               <div className="space-y-6">
                 {/* Objective / method badges */}
@@ -812,20 +948,23 @@ const CreateCarousel = () => {
                   </Badge>
                 </div>
 
-                <div>
-                  <Label className="text-foreground font-display mb-2 block">
-                    Nome do produto *<BrandBadge field="productName" />
-                  </Label>
-                  <Input
-                    value={productName}
-                    onChange={(e) => setProductName(e.target.value)}
-                    placeholder="Ex: Curso de Marketing Digital"
-                    className="bg-background/50"
-                  />
-                </div>
+                {/* productName — hidden for ideia (auto-set from brand) */}
+                {method !== "ideia" && (
+                  <div>
+                    <Label className="text-foreground font-display mb-2 block">
+                      Nome do produto *<BrandBadge field="productName" />
+                    </Label>
+                    <Input
+                      value={productName}
+                      onChange={(e) => setProductName(e.target.value)}
+                      placeholder="Ex: Curso de Marketing Digital"
+                      className="bg-background/50"
+                    />
+                  </div>
+                )}
 
-                {/* Promise hidden for link method */}
-                {method !== "link" && (
+                {/* mainPromise — not link, not ideia */}
+                {method !== "link" && method !== "ideia" && (
                   <div>
                     <Label className="text-foreground font-display mb-2 flex items-center gap-2">
                       Promessa principal *
@@ -846,6 +985,7 @@ const CreateCarousel = () => {
                   </div>
                 )}
 
+                {/* Slides count — all methods */}
                 <div className="space-y-3">
                   <Label className="text-foreground font-display block">
                     Quantidade de slides
@@ -873,6 +1013,60 @@ const CreateCarousel = () => {
                     ))}
                   </div>
                 </div>
+
+                {/* Ideia-specific: style + idea + CTA */}
+                {method === "ideia" && (
+                  <>
+                    <div className="space-y-3">
+                      <Label className="text-foreground font-display block">Estilo do Carrossel</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { value: "dark", label: "Dark / Escuro" },
+                          { value: "light", label: "Claro / Light" },
+                          { value: "clean", label: "Clean / Minimalista" },
+                          { value: "premium", label: "Premium / Luxuoso" },
+                          { value: "playful", label: "Infantil / Lúdico" },
+                          { value: "tech", label: "Tecnológico / Futurista" },
+                          { value: "vibrant", label: "Vibrante / Chamativo" },
+                          { value: "corporate", label: "Corporativo / Profissional" },
+                        ].map((style) => (
+                          <button
+                            key={style.value}
+                            type="button"
+                            onClick={() => setCreativeStyle(creativeStyle === style.value ? "" : style.value)}
+                            className={`px-3 py-1.5 rounded-xl text-sm font-medium border-2 transition-all duration-200 ${
+                              creativeStyle === style.value
+                                ? "border-primary bg-primary/10 text-primary shadow-md scale-105"
+                                : "border-border bg-background/50 text-muted-foreground hover:border-primary/50 hover:bg-primary/5"
+                            }`}
+                          >
+                            {style.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-foreground font-display block">Descreva sua ideia *</Label>
+                      <Textarea
+                        value={idea}
+                        onChange={(e) => setIdea(e.target.value)}
+                        placeholder="Ex: Quero criar um carrossel mostrando o passo a passo de como usar meu produto, focando nos resultados que o cliente vai ter..."
+                        className="bg-background/50 border-border resize-none"
+                        rows={5}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-foreground font-display block">CTA do slide final (opcional)</Label>
+                      <CTASelector
+                        value={carouselCta}
+                        onChange={setCarouselCta}
+                        placeholder="Ou digite um CTA personalizado..."
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -911,26 +1105,6 @@ const CreateCarousel = () => {
                     placeholder="Ex: É muito caro, não tenho tempo, será que funciona..."
                     className="bg-background/50"
                     rows={3}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* ── Step 1 — Ideia (ideia method) ── */}
-            {step === 1 && method === "ideia" && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-display text-foreground mb-2">Sua Ideia</h2>
-                  <p className="text-muted-foreground text-sm">Descreva o que você quer criar e a IA vai estruturar para você</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Descreva sua ideia *</Label>
-                  <Textarea
-                    value={idea}
-                    onChange={(e) => setIdea(e.target.value)}
-                    placeholder="Ex: Quero criar um carrossel mostrando o passo a passo de como usar meu produto..."
-                    className="bg-background/50 border-border resize-none"
-                    rows={6}
                   />
                 </div>
               </div>
@@ -997,59 +1171,101 @@ const CreateCarousel = () => {
               </div>
             )}
 
-            {/* ── Step 2 — Estratégia (zero) ── */}
-            {step === 2 && method === "zero" && estrategiaStepContent}
-
-            {/* ── Step 2 — Revisar (ideia method) ── */}
-            {step === 2 && method === "ideia" && (
+            {/* ── Step 1 — Revisar (ideia method) ── */}
+            {step === 1 && method === "ideia" && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-xl font-display text-foreground mb-2">Revisar Ideia</h2>
-                  <p className="text-muted-foreground text-sm">A IA estruturou sua ideia — revise antes de continuar</p>
+                  <h2 className="text-xl font-display text-foreground mb-1">Revisar Slides</h2>
+                  <p className="text-muted-foreground text-sm">Edite os slides gerados pela IA antes de criar as imagens</p>
                 </div>
 
-                {formattingIdea && (
-                  <div className="flex flex-col items-center py-12 space-y-4">
-                    <Sparkles className="w-8 h-8 text-primary animate-pulse" />
-                    <p className="text-muted-foreground text-sm">Formatando sua ideia...</p>
-                  </div>
-                )}
+                <div className="space-y-4">
+                  {editableSlides.map((slide, idx) => {
+                    const roleKey = slide.slide_role.toLowerCase();
+                    const colorClass = ROLE_COLORS[roleKey] || "bg-muted text-muted-foreground border-border";
+                    return (
+                      <div key={idx} className="rounded-xl border border-border bg-background/50 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-muted-foreground">{slide.slide_number}</span>
+                            <Badge variant="outline" className={`${colorClass} text-[10px] px-1.5 py-0`}>
+                              {slide.slide_role}
+                            </Badge>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setRefineSlideIdx(idx); setRefineSlideInstruction(""); }}
+                            className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline px-2 py-1 rounded-lg border border-primary/30 hover:bg-primary/5 transition-colors"
+                          >
+                            <Sparkles className="w-3 h-3" /> Melhorar com IA
+                          </button>
+                        </div>
 
-                {!formattingIdea && formattedIdea && (
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-border bg-background/50 p-5 space-y-4">
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Resumo</p>
-                        <p className="text-sm text-foreground leading-relaxed">{formattedIdea.summary}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Promessa Principal</p>
-                        <p className="text-sm text-foreground">{formattedIdea.promise}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Ângulo Criativo</p>
-                        <p className="text-sm text-foreground">{formattedIdea.angle}</p>
-                      </div>
-                    </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Headline</Label>
+                          <Input
+                            value={slide.headline}
+                            onChange={(e) => setEditableSlides((prev) =>
+                              prev.map((s, i) => i === idx ? { ...s, headline: e.target.value } : s)
+                            )}
+                            className="bg-background text-sm h-9"
+                          />
+                        </div>
 
-                    <div className="flex gap-3 pt-2 border-t border-border mt-6">
-                      <Button variant="outline" onClick={() => { setFormattedIdea(null); setStep(1); }}>
-                        <ArrowLeft className="w-4 h-4" /> Editar Ideia
-                      </Button>
-                      <Button variant="hero" onClick={() => setStep(3)}>
-                        Usar esta versão <ArrowRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Desenvolvimento</Label>
+                          <Textarea
+                            value={slide.subtext}
+                            onChange={(e) => setEditableSlides((prev) =>
+                              prev.map((s, i) => i === idx ? { ...s, subtext: e.target.value } : s)
+                            )}
+                            className="bg-background text-sm resize-none"
+                            rows={2}
+                          />
+                        </div>
+
+                        {slide.cta && (
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">CTA</Label>
+                            <Input
+                              value={slide.cta}
+                              onChange={(e) => setEditableSlides((prev) =>
+                                prev.map((s, i) => i === idx ? { ...s, cta: e.target.value } : s)
+                              )}
+                              className="bg-background text-sm h-9"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-3 pt-2 border-t border-border">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setGeneratedCopy(null);
+                      setEditableSlides([]);
+                      setSlideStates([]);
+                      setRequestId(null);
+                      setStep(0);
+                    }}
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Editar Ideia
+                  </Button>
+                  <Button variant="hero" onClick={() => setStep(CRIAR_STEP)}>
+                    Gerar Carrossel <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             )}
 
-            {/* ── Step 3 — Estratégia (ideia method) ── */}
-            {step === 3 && method === "ideia" && estrategiaStepContent}
+            {/* ── Step 2 — Estratégia (zero) ── */}
+            {step === 2 && method === "zero" && estrategiaStepContent}
 
-            {/* ── Standard footer navigation (hidden on review step) ── */}
-            {!(method === "ideia" && step === 2) && (
+            {/* ── Standard footer navigation ── */}
+            {!(method === "ideia" && step === 1) && (
               <div className="flex justify-between mt-8 pt-6 border-t border-border">
                 <Button
                   variant="outline"
@@ -1059,7 +1275,19 @@ const CreateCarousel = () => {
                   {step > 0 ? "Voltar" : "Dashboard"}
                 </Button>
 
-                {step === CRIAR_STEP - 1 ? (
+                {method === "ideia" && step === 0 ? (
+                  <Button
+                    variant="hero"
+                    onClick={handleAdvanceFromStep0Ideia}
+                    disabled={!canProceed() || isGeneratingBrief}
+                  >
+                    {isGeneratingBrief ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Gerando briefing...</>
+                    ) : (
+                      <>Revisar Slides <ArrowRight className="w-4 h-4" /></>
+                    )}
+                  </Button>
+                ) : step === CRIAR_STEP - 1 ? (
                   <Button variant="hero" onClick={() => setStep(CRIAR_STEP)} disabled={!canProceed()}>
                     Próximo <ArrowRight className="w-4 h-4" />
                   </Button>
@@ -1101,107 +1329,114 @@ const CreateCarousel = () => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {generatedCopy.slides.map((slide, idx) => {
-                  const roleKey = slide.slide_role.toLowerCase();
-                  const colorClass = ROLE_COLORS[roleKey] || "bg-muted text-muted-foreground border-border";
-                  const state = slideStates[idx];
+              {(() => {
+                const slidesSource = method === "ideia" && editableSlides.length > 0
+                  ? editableSlides
+                  : generatedCopy.slides;
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {slidesSource.map((slide, idx) => {
+                      const roleKey = slide.slide_role.toLowerCase();
+                      const colorClass = ROLE_COLORS[roleKey] || "bg-muted text-muted-foreground border-border";
+                      const state = slideStates[idx];
 
-                  return (
-                    <div
-                      key={idx}
-                      className="relative aspect-square gradient-card rounded-2xl border border-border shadow-card overflow-hidden flex flex-col"
-                    >
-                      {state?.loading && (
-                        <div className="absolute inset-0 z-10 bg-background/85 flex flex-col items-center justify-center gap-2">
-                          <Loader2 className="w-6 h-6 text-primary animate-spin" />
-                          <p className="text-xs text-muted-foreground">Gerando slide {slide.slide_number}...</p>
-                        </div>
-                      )}
-
-                      {state?.imageUrl && !state?.loading && (
-                        <div className="absolute inset-0 z-10">
-                          <img
-                            src={state.imageUrl}
-                            alt={`Slide ${slide.slide_number}`}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute top-2 left-2">
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-500/90 text-white text-[10px] font-medium">
-                              <Check className="w-2.5 h-2.5" /> Gerado
-                            </span>
-                          </div>
-                          <div className="absolute bottom-2 inset-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full text-xs h-7 bg-background/80 backdrop-blur-sm"
-                              onClick={() => setSlideStates((prev) => prev.map((s, i) => i === idx ? { ...s, imageUrl: null } : s))}
-                            >
-                              <RefreshCw className="w-3 h-3" /> Regenerar
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex flex-col h-full p-3">
-                        <div className="flex items-center gap-1.5 mb-2 shrink-0">
-                          <span className="text-[10px] font-bold text-muted-foreground leading-none">
-                            {slide.slide_number}
-                          </span>
-                          <Badge variant="outline" className={`${colorClass} text-[10px] px-1.5 py-0 leading-5`}>
-                            {slide.slide_role}
-                          </Badge>
-                        </div>
-
-                        <h3 className="text-sm font-display text-foreground leading-snug line-clamp-3 mb-1.5 shrink-0">
-                          {slide.headline}
-                        </h3>
-
-                        {slide.subtext && (
-                          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 flex-1">
-                            {slide.subtext}
-                          </p>
-                        )}
-
-                        {!slide.subtext && <div className="flex-1" />}
-
-                        {slide.cta && (
-                          <span className="mt-1.5 mb-1.5 self-start inline-block px-2 py-0.5 rounded gradient-primary text-primary-foreground text-[10px] font-semibold shrink-0">
-                            {slide.cta}
-                          </span>
-                        )}
-
-                        {!state?.imageUrl && (
-                          <div className="border-t border-border/50 mt-auto pt-2 space-y-2 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => openImageDialog(idx)}
-                              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors px-1.5 py-1 rounded-lg border border-border/60 hover:border-primary/40 bg-background/40"
-                            >
-                              <Images className="w-3 h-3" />
-                              Adicionar Imagem
-                              {(state?.extraImages?.length ?? 0) > 0 && (
-                                <span className="ml-0.5 text-primary font-medium">({state.extraImages.length})</span>
-                              )}
-                            </button>
-                            <div className="flex items-center gap-1.5">
-                              <Switch
-                                checked={state?.useAiImage ?? true}
-                                onCheckedChange={(checked) =>
-                                  setSlideStates((prev) => prev.map((s, i) => i === idx ? { ...s, useAiImage: checked } : s))
-                                }
-                                className="scale-75 origin-left"
-                              />
-                              <span className="text-[10px] text-muted-foreground leading-none">Criar com IA</span>
+                      return (
+                        <div
+                          key={idx}
+                          className="relative aspect-square gradient-card rounded-2xl border border-border shadow-card overflow-hidden flex flex-col"
+                        >
+                          {state?.loading && (
+                            <div className="absolute inset-0 z-10 bg-background/85 flex flex-col items-center justify-center gap-2">
+                              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                              <p className="text-xs text-muted-foreground">Gerando slide {slide.slide_number}...</p>
                             </div>
+                          )}
+
+                          {state?.imageUrl && !state?.loading && (
+                            <div className="absolute inset-0 z-10">
+                              <img
+                                src={state.imageUrl}
+                                alt={`Slide ${slide.slide_number}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute top-2 left-2">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-500/90 text-white text-[10px] font-medium">
+                                  <Check className="w-2.5 h-2.5" /> Gerado
+                                </span>
+                              </div>
+                              <div className="absolute bottom-2 inset-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full text-xs h-7 bg-background/80 backdrop-blur-sm"
+                                  onClick={() => setSlideStates((prev) => prev.map((s, i) => i === idx ? { ...s, imageUrl: null } : s))}
+                                >
+                                  <RefreshCw className="w-3 h-3" /> Regenerar
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex flex-col h-full p-3">
+                            <div className="flex items-center gap-1.5 mb-2 shrink-0">
+                              <span className="text-[10px] font-bold text-muted-foreground leading-none">
+                                {slide.slide_number}
+                              </span>
+                              <Badge variant="outline" className={`${colorClass} text-[10px] px-1.5 py-0 leading-5`}>
+                                {slide.slide_role}
+                              </Badge>
+                            </div>
+
+                            <h3 className="text-sm font-display text-foreground leading-snug line-clamp-3 mb-1.5 shrink-0">
+                              {slide.headline}
+                            </h3>
+
+                            {slide.subtext && (
+                              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 flex-1">
+                                {slide.subtext}
+                              </p>
+                            )}
+
+                            {!slide.subtext && <div className="flex-1" />}
+
+                            {slide.cta && (
+                              <span className="mt-1.5 mb-1.5 self-start inline-block px-2 py-0.5 rounded gradient-primary text-primary-foreground text-[10px] font-semibold shrink-0">
+                                {slide.cta}
+                              </span>
+                            )}
+
+                            {!state?.imageUrl && (
+                              <div className="border-t border-border/50 mt-auto pt-2 space-y-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => openImageDialog(idx)}
+                                  className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors px-1.5 py-1 rounded-lg border border-border/60 hover:border-primary/40 bg-background/40"
+                                >
+                                  <Images className="w-3 h-3" />
+                                  Adicionar Imagem
+                                  {(state?.extraImages?.length ?? 0) > 0 && (
+                                    <span className="ml-0.5 text-primary font-medium">({state.extraImages.length})</span>
+                                  )}
+                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  <Switch
+                                    checked={state?.useAiImage ?? true}
+                                    onCheckedChange={(checked) =>
+                                      setSlideStates((prev) => prev.map((s, i) => i === idx ? { ...s, useAiImage: checked } : s))
+                                    }
+                                    className="scale-75 origin-left"
+                                  />
+                                  <span className="text-[10px] text-muted-foreground leading-none">Criar com IA</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
               {/* Legenda do post */}
               {generatedCopy.ad_caption && (
@@ -1216,7 +1451,7 @@ const CreateCarousel = () => {
                   <Textarea
                     value={editedCaption || generatedCopy.ad_caption}
                     onChange={(e) => setEditedCaption(e.target.value)}
-                    rows={4}
+                    rows={6}
                     className="text-sm resize-none"
                   />
                 </div>
@@ -1230,7 +1465,12 @@ const CreateCarousel = () => {
                     setGeneratedCopy(null);
                     setSlideStates([]);
                     setRequestId(null);
-                    setStep(CRIAR_STEP - 1);
+                    if (method === "ideia") {
+                      setEditableSlides([]);
+                      setStep(0);
+                    } else {
+                      setStep(CRIAR_STEP - 1);
+                    }
                   }}
                 >
                   <RefreshCw className="w-4 h-4" /> Regenerar Copy
@@ -1261,7 +1501,7 @@ const CreateCarousel = () => {
       <Dialog open={imageDialogSlide !== null} onOpenChange={(open) => { if (!open) setImageDialogSlide(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="font-normal">
               Adicionar imagem — Slide {imageDialogSlide !== null ? imageDialogSlide + 1 : ""}
             </DialogTitle>
           </DialogHeader>
@@ -1281,6 +1521,46 @@ const CreateCarousel = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setImageDialogSlide(null)}>Cancelar</Button>
             <Button variant="hero" onClick={confirmImageDialog}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Refine slide dialog ───────────────────────────────────────────── */}
+      <Dialog open={refineSlideIdx !== null} onOpenChange={(open) => { if (!open) { setRefineSlideIdx(null); setRefineSlideInstruction(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-normal">
+              Melhorar Slide {refineSlideIdx !== null ? refineSlideIdx + 1 : ""} com IA
+            </DialogTitle>
+            <DialogDescription>
+              Descreva como você quer melhorar este slide e a IA vai reescrever o conteúdo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Textarea
+              value={refineSlideInstruction}
+              onChange={(e) => setRefineSlideInstruction(e.target.value)}
+              placeholder="Ex: deixe o headline mais impactante, foque na dor do cliente, use linguagem mais direta..."
+              rows={4}
+              className="resize-none"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRefineSlideIdx(null); setRefineSlideInstruction(""); }}>
+              Cancelar
+            </Button>
+            <Button
+              variant="hero"
+              onClick={handleRefineSlide}
+              disabled={isRefiningSlide || !refineSlideInstruction.trim()}
+            >
+              {isRefiningSlide ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Melhorando...</>
+              ) : (
+                <><Sparkles className="w-4 h-4" /> Melhorar</>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

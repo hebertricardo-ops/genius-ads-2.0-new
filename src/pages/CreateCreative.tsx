@@ -19,6 +19,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -51,11 +52,16 @@ interface CopyAngle {
 }
 
 interface FormattedIdea {
+  formatted_text?: string;
   promise: string;
   pains: string;
   benefits: string;
   angle: string;
-  summary: string;
+  summary?: string;
+  headline?: string;
+  subheadline?: string;
+  development?: string;
+  cta_suggestion?: string;
 }
 
 const BRAND_VISUAL_STYLE_MAP: Record<string, string> = {
@@ -80,7 +86,7 @@ const CreateCreative = () => {
   };
 
   const STEPS =
-    method === "ideia" ? ["Produto", "Ideia", "Revisar", "CTA", "Criar"] :
+    method === "ideia" ? ["Produto", "Revisar", "Criar"] :
     method === "link"  ? ["Produto", "Link", "Criar"] :
                          ["Produto", "Persuasão", "CTA", "Criar"];
   const CRIAR_STEP = STEPS.length - 1;
@@ -119,6 +125,10 @@ const CreateCreative = () => {
   const [idea, setIdea] = useState("");
   const [formattedIdea, setFormattedIdea] = useState<FormattedIdea | null>(null);
   const [formattingIdea, setFormattingIdea] = useState(false);
+  const [editableFormattedText, setEditableFormattedText] = useState("");
+  const [showRefineDialog, setShowRefineDialog] = useState(false);
+  const [refineInstruction, setRefineInstruction] = useState("");
+  const [isRefining, setIsRefining] = useState(false);
   const [link, setLink] = useState("");
   const [linkScraped, setLinkScraped] = useState(false);
   const [isScraping, setIsScraping] = useState(false);
@@ -161,6 +171,16 @@ const CreateCreative = () => {
     setBrandFilledFields(filled);
   }, [selectedBrand?.id]);
 
+  // ── Ensure productName/promise are set for ideia method ──────────────────
+  useEffect(() => {
+    if (method === "ideia" && selectedBrand?.name) {
+      setProductName(selectedBrand.name);
+      if (!promise && selectedBrand.description) {
+        setPromise(selectedBrand.description);
+      }
+    }
+  }, [method, selectedBrand?.id]);
+
   // ── Auto-generate promise via AI ──────────────────────────────────────────
   useEffect(() => {
     if (!selectedBrand || selectedBrand.generated_promise) return;
@@ -202,7 +222,7 @@ const CreateCreative = () => {
 
   // ── Auto-format idea when entering review step ────────────────────────────
   useEffect(() => {
-    if (method === "ideia" && step === 2 && !formattedIdea && !formattingIdea) {
+    if (method === "ideia" && step === 1 && !formattedIdea && !formattingIdea) {
       handleFormatIdea();
     }
   }, [step]);
@@ -219,10 +239,8 @@ const CreateCreative = () => {
     }
     if (method === "ideia") {
       switch (step) {
-        case 0: return productName.trim().length > 0 && promise.trim().length > 0;
-        case 1: return idea.trim().length > 0;
-        case 2: return !!formattedIdea;
-        case 3: return true;
+        case 0: return idea.trim().length > 0;
+        case 1: return !!editableFormattedText.trim();
         default: return false;
       }
     }
@@ -241,20 +259,29 @@ const CreateCreative = () => {
     setFormattingIdea(true);
     try {
       const { data, error } = await supabase.functions.invoke("format-idea", {
-        body: { idea, objective, product: productName },
+        body: {
+          idea,
+          objective,
+          product: productName || selectedBrand?.name,
+          cta: cta || undefined,
+          brand_context: selectedBrand
+            ? { name: selectedBrand.name, description: selectedBrand.description }
+            : undefined,
+        },
       });
       if (error) throw error;
       if (!data?.formatted) throw new Error("Resposta inválida da IA");
 
       const f: FormattedIdea = data.formatted;
       setFormattedIdea(f);
+      setEditableFormattedText(f.formatted_text ?? "");
 
-      if (f.promise) { setPromise(f.promise); setBrandFilledFields((p) => new Set([...p, "promise"])); }
-      if (f.pains)   { setPains(f.pains);     setBrandFilledFields((p) => new Set([...p, "pains"])); }
-      if (f.benefits){ setBenefits(f.benefits); setBrandFilledFields((p) => new Set([...p, "benefits"])); }
+      if (f.promise)  { setPromise(f.promise);     setBrandFilledFields((p) => new Set([...p, "promise"])); }
+      if (f.pains)    { setPains(f.pains);          setBrandFilledFields((p) => new Set([...p, "pains"])); }
+      if (f.benefits) { setBenefits(f.benefits);    setBrandFilledFields((p) => new Set([...p, "benefits"])); }
     } catch (err: any) {
       toast({ title: "Erro ao formatar ideia", description: err.message, variant: "destructive" });
-      setStep(1);
+      setStep(0);
     } finally {
       setFormattingIdea(false);
     }
@@ -389,8 +416,6 @@ const CreateCreative = () => {
 
     setGeneratingCreative(true);
     try {
-      // Para method 'ideia': criar o creative_request antes de gerar a imagem
-      // (handleGenerate() nunca é chamado neste fluxo, então currentRequestId === null)
       let requestId = currentRequestId;
       if (method === "ideia" && !requestId) {
         const { data: reqData, error: reqError } = await supabase
@@ -445,42 +470,48 @@ const CreateCreative = () => {
         selectedBrand?.color_accent,
       ].filter(Boolean) as string[];
 
+      const ideaHeadline = formattedIdea?.headline ?? formattedIdea?.angle ?? "";
+      const ideaBody     = formattedIdea?.subheadline ?? formattedIdea?.summary ?? "";
+      const ideaCta      = cta || formattedIdea?.cta_suggestion || "Saiba mais";
+
       const { data: creativeData, error: creativeError } = await supabase.functions.invoke("generate-creative", {
         body: {
           image_urls: imageUrls,
           logo_url: logoUrl,
           product_name: productName,
-          promise: method === "ideia" ? formattedIdea!.promise : promise,
-          pains: method === "ideia" ? formattedIdea!.pains : pains,
-          benefits: method === "ideia" ? formattedIdea!.benefits : benefits,
+          promise:   method === "ideia" ? formattedIdea!.promise   : promise,
+          pains:     method === "ideia" ? formattedIdea!.pains     : pains,
+          benefits:  method === "ideia" ? formattedIdea!.benefits  : benefits,
           objections: objections || null,
-          headline: method === "ideia" ? formattedIdea!.angle : angle!.headline,
-          body: method === "ideia" ? formattedIdea!.summary : angle!.body,
-          cta: method === "ideia" ? (cta || "Saiba mais") : angle!.cta,
+          headline:  method === "ideia" ? ideaHeadline             : angle!.headline,
+          body:      method === "ideia" ? ideaBody                 : angle!.body,
+          cta:       method === "ideia" ? ideaCta                  : angle!.cta,
           visual_option: visual ? {
-            visual_description: visual.visual_description,
+            visual_description:   visual.visual_description,
             element_distribution: visual.element_distribution,
-            composition: visual.composition,
-            visual_hierarchy: visual.visual_hierarchy,
-            layout_style: visual.layout_style,
-            cta_highlight: visual.cta_highlight,
-            thematic_elements: visual.thematic_elements,
+            composition:          visual.composition,
+            visual_hierarchy:     visual.visual_hierarchy,
+            layout_style:         visual.layout_style,
+            cta_highlight:        visual.cta_highlight,
+            thematic_elements:    visual.thematic_elements,
           } : undefined,
           format,
           creative_style: creativeStyle || undefined,
           color_palette: brandColors.length > 0 ? brandColors : undefined,
-          additional_instructions: additionalInstructions.trim() || undefined,
+          additional_instructions: method === "ideia"
+            ? (editableFormattedText || undefined)
+            : (additionalInstructions.trim() || undefined),
           image_instructions: imageInstructions.length > 0 ? imageInstructions : undefined,
           model: imageModel,
           save_data: {
             request_id: requestId,
             brand_id: selectedBrand?.id ?? null,
             copy_data: {
-              angle_name: method === "ideia" ? "Ideia formatada" : angle!.angle_name,
-              headline: method === "ideia" ? formattedIdea!.angle : angle!.headline,
-              subheadline: method === "ideia" ? undefined : angle!.subheadline,
-              body: method === "ideia" ? formattedIdea!.summary : angle!.body,
-              cta: method === "ideia" ? (cta || "Saiba mais") : angle!.cta,
+              angle_name:  method === "ideia" ? "Ideia formatada"       : angle!.angle_name,
+              headline:    method === "ideia" ? ideaHeadline             : angle!.headline,
+              subheadline: method === "ideia" ? formattedIdea!.subheadline : angle!.subheadline,
+              body:        method === "ideia" ? ideaBody                 : angle!.body,
+              cta:         method === "ideia" ? ideaCta                  : angle!.cta,
               visual_option: visual ?? null,
               format,
             },
@@ -501,7 +532,6 @@ const CreateCreative = () => {
       queryClient.invalidateQueries({ queryKey: ["credits"] });
       queryClient.invalidateQueries({ queryKey: ["creative-requests"] });
 
-      // Marcar request como concluído (para fluxo ideia que cria o registro aqui)
       if (requestId) {
         await supabase
           .from("creative_requests")
@@ -568,6 +598,9 @@ const CreateCreative = () => {
     setImageDialogOpen(false);
     setIdea("");
     setFormattedIdea(null);
+    setEditableFormattedText("");
+    setRefineInstruction("");
+    setShowRefineDialog(false);
     setLink("");
     setLinkScraped(false);
   };
@@ -581,7 +614,7 @@ const CreateCreative = () => {
 
   const angleLabels = ["🔴 Dor Principal", "🟢 Transformação", "🟡 Quebra de Objeção"];
 
-  // ── CTA step content (shared between zero/step2 and ideia/step3) ──────────
+  // ── CTA step content (zero method only) ──────────────────────────────────
   const ctaStepContent = (
     <div className="space-y-6">
       <div>
@@ -648,46 +681,51 @@ const CreateCreative = () => {
                   </Badge>
                 </div>
 
-                <div>
-                  <h2 className="text-xl font-display text-foreground mb-2">Sobre o produto</h2>
-                  <p className="text-muted-foreground text-sm">Informações básicas para gerar a copy do anúncio</p>
-                </div>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">
-                      Nome do produto *<BrandBadge field="productName" />
-                    </Label>
-                    <Input
-                      value={productName}
-                      onChange={(e) => setProductName(e.target.value)}
-                      placeholder="Ex: Sérum Vitamina C Premium"
-                      className="bg-background/50 border-border"
-                    />
-                  </div>
-
-                  {/* Promise hidden for link method */}
-                  {method !== "link" && (
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground flex items-center gap-2">
-                        Promessa principal *
-                        {generatingPromise && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
-                            <Sparkles className="w-2.5 h-2.5 animate-pulse" /> gerando...
-                          </span>
-                        )}
-                      </Label>
-                      <Textarea
-                        value={promise}
-                        onChange={(e) => setPromise(e.target.value)}
-                        placeholder="Ex: Pele mais jovem e radiante em 30 dias"
-                        className="bg-background/50 border-border resize-none"
-                        rows={3}
-                        disabled={generatingPromise}
-                      />
+                {/* Product name + promise — hidden for ideia (set automatically from brand) */}
+                {method !== "ideia" && (
+                  <>
+                    <div>
+                      <h2 className="text-xl font-display text-foreground mb-2">Sobre o produto</h2>
+                      <p className="text-muted-foreground text-sm">Informações básicas para gerar a copy do anúncio</p>
                     </div>
-                  )}
-                </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">
+                          Nome do produto *<BrandBadge field="productName" />
+                        </Label>
+                        <Input
+                          value={productName}
+                          onChange={(e) => setProductName(e.target.value)}
+                          placeholder="Ex: Sérum Vitamina C Premium"
+                          className="bg-background/50 border-border"
+                        />
+                      </div>
 
+                      {method !== "link" && (
+                        <div className="space-y-2">
+                          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                            Promessa principal *
+                            {generatingPromise && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                <Sparkles className="w-2.5 h-2.5 animate-pulse" /> gerando...
+                              </span>
+                            )}
+                          </Label>
+                          <Textarea
+                            value={promise}
+                            onChange={(e) => setPromise(e.target.value)}
+                            placeholder="Ex: Pele mais jovem e radiante em 30 dias"
+                            className="bg-background/50 border-border resize-none"
+                            rows={3}
+                            disabled={generatingPromise}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Creative style — all methods */}
                 <div className="space-y-3 pt-2 border-t border-border">
                   <h2 className="text-xl font-display text-foreground pt-2">
                     Estilo do Criativo<BrandBadge field="creativeStyle" />
@@ -721,6 +759,30 @@ const CreateCreative = () => {
                     <p className="text-xs text-muted-foreground">Nenhum estilo selecionado — a IA escolherá automaticamente.</p>
                   )}
                 </div>
+
+                {/* Ideia method: idea textarea + CTASelector */}
+                {method === "ideia" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Descreva sua ideia *</Label>
+                      <Textarea
+                        value={idea}
+                        onChange={(e) => setIdea(e.target.value)}
+                        placeholder="Ex: Quero criar um post mostrando como meu produto ajuda pessoas ocupadas a economizar tempo no dia a dia..."
+                        className="bg-background/50 border-border resize-none"
+                        rows={5}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Call to Action (opcional)</Label>
+                      <CTASelector
+                        value={cta}
+                        onChange={setCta}
+                        placeholder='Ex: "Clique em Saiba Mais"'
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -748,26 +810,6 @@ const CreateCreative = () => {
                     <Label className="text-sm text-muted-foreground">Objeções comuns (opcional)</Label>
                     <Textarea value={objections} onChange={(e) => setObjections(e.target.value)} placeholder='Ex: "É caro", "Será que funciona?"' className="bg-background/50 border-border resize-none" rows={2} />
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* ── Step 1 — Ideia (ideia method) ── */}
-            {step === 1 && method === "ideia" && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-display text-foreground mb-2">Sua Ideia</h2>
-                  <p className="text-muted-foreground text-sm">Descreva o que você quer criar e a IA vai estruturar para você</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Descreva sua ideia *</Label>
-                  <Textarea
-                    value={idea}
-                    onChange={(e) => setIdea(e.target.value)}
-                    placeholder="Ex: Quero criar um post mostrando como meu produto ajuda pessoas ocupadas a economizar tempo no dia a dia..."
-                    className="bg-background/50 border-border resize-none"
-                    rows={6}
-                  />
                 </div>
               </div>
             )}
@@ -833,60 +875,65 @@ const CreateCreative = () => {
               </div>
             )}
 
-            {/* ── Step 2 — CTA (zero) ── */}
-            {step === 2 && method === "zero" && ctaStepContent}
-
-            {/* ── Step 2 — Revisar (ideia method) ── */}
-            {step === 2 && method === "ideia" && (
-              <div className="space-y-6">
+            {/* ── Step 1 — Revisar (ideia method) ── */}
+            {step === 1 && method === "ideia" && (
+              <div className="space-y-4">
                 <div>
-                  <h2 className="text-xl font-display text-foreground mb-2">Revisar Ideia</h2>
-                  <p className="text-muted-foreground text-sm">A IA estruturou sua ideia — revise antes de continuar</p>
+                  <h2 className="text-xl font-display text-foreground mb-1">Briefing gerado pela IA</h2>
+                  <p className="text-sm text-muted-foreground">Revise e edite o briefing antes de gerar o criativo.</p>
                 </div>
 
-                {formattingIdea && (
+                {formattingIdea ? (
                   <div className="flex flex-col items-center py-12 space-y-4">
                     <Sparkles className="w-8 h-8 text-primary animate-pulse" />
-                    <p className="text-muted-foreground text-sm">Formatando sua ideia...</p>
+                    <p className="text-muted-foreground text-sm">Estruturando sua ideia...</p>
                   </div>
-                )}
+                ) : (
+                  <>
+                    <Textarea
+                      value={editableFormattedText}
+                      onChange={(e) => setEditableFormattedText(e.target.value)}
+                      rows={18}
+                      className="font-mono text-sm resize-none bg-background/50 border-border"
+                      placeholder="Briefing do criativo..."
+                    />
 
-                {!formattingIdea && formattedIdea && (
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-border bg-background/50 p-5 space-y-4">
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Resumo</p>
-                        <p className="text-sm text-foreground leading-relaxed">{formattedIdea.summary}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Promessa Principal</p>
-                        <p className="text-sm text-foreground">{formattedIdea.promise}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Ângulo Criativo</p>
-                        <p className="text-sm text-foreground">{formattedIdea.angle}</p>
-                      </div>
-                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2"
+                      onClick={() => setShowRefineDialog(true)}
+                      disabled={!editableFormattedText.trim()}
+                    >
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      Melhorar com IA
+                    </Button>
 
-                    {/* Review-specific navigation (replaces standard footer) */}
-                    <div className="flex gap-3 pt-2 border-t border-border mt-6">
-                      <Button variant="outline" onClick={() => { setFormattedIdea(null); setStep(1); }}>
-                        <ArrowLeft className="w-4 h-4" /> Editar Ideia
+                    <div className="flex gap-3 pt-2 border-t border-border">
+                      <Button
+                        variant="outline"
+                        onClick={() => { setFormattedIdea(null); setEditableFormattedText(""); setStep(0); }}
+                      >
+                        <ArrowLeft className="w-4 h-4 mr-1" /> Editar Ideia
                       </Button>
-                      <Button variant="hero" onClick={() => setStep(3)}>
-                        Usar esta versão <ArrowRight className="w-4 h-4" />
+                      <Button
+                        variant="hero"
+                        className="flex-1"
+                        onClick={() => setStep(CRIAR_STEP)}
+                        disabled={!editableFormattedText.trim()}
+                      >
+                        Gerar Criativo <ArrowRight className="w-4 h-4 ml-1" />
                       </Button>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             )}
 
-            {/* ── Step 3 — CTA (ideia method) ── */}
-            {step === 3 && method === "ideia" && ctaStepContent}
+            {/* ── Step 2 — CTA (zero) ── */}
+            {step === 2 && method === "zero" && ctaStepContent}
 
-            {/* ── Standard footer navigation (hidden on review step) ── */}
-            {!(method === "ideia" && step === 2) && (
+            {/* ── Standard footer navigation (hidden on ideia review step) ── */}
+            {!(method === "ideia" && step === 1) && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
                 <Button variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>
                   <ArrowLeft className="w-4 h-4" /> Voltar
@@ -905,17 +952,47 @@ const CreateCreative = () => {
           </div>
         )}
 
-        {/* ── Criar step ─────────────────────────────────────────────────── */}
+        {/* ── Criar step — ideia ──────────────────────────────────────────── */}
         {step === CRIAR_STEP && method === "ideia" && (
           <div className="space-y-8 animate-fade-in">
             {formattedIdea && (
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-muted-foreground">Copy gerada a partir da sua ideia</p>
-                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Ângulo</p>
-                  <p className="font-medium">{formattedIdea.angle}</p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mt-2">Resumo</p>
-                  <p className="text-sm text-muted-foreground">{formattedIdea.summary}</p>
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-4">
+                <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+                  Copy gerada a partir da sua ideia
+                </p>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Headline</p>
+                  <p className="text-sm font-semibold text-foreground leading-snug">
+                    {formattedIdea.headline ?? formattedIdea.angle ?? "—"}
+                  </p>
+                </div>
+
+                <div className="border-t border-border/50" />
+
+                <div className="space-y-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Sub-headline</p>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {formattedIdea.subheadline ?? formattedIdea.summary ?? "—"}
+                  </p>
+                </div>
+
+                <div className="border-t border-border/50" />
+
+                <div className="space-y-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Desenvolvimento</p>
+                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
+                    {formattedIdea.development ?? formattedIdea.benefits ?? "—"}
+                  </p>
+                </div>
+
+                <div className="border-t border-border/50" />
+
+                <div className="space-y-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">CTA</p>
+                  <p className="text-sm font-medium text-primary">
+                    {cta || formattedIdea.cta_suggestion || "—"}
+                  </p>
                 </div>
               </div>
             )}
@@ -1013,6 +1090,7 @@ const CreateCreative = () => {
           </div>
         )}
 
+        {/* ── Criar step — zero / link ────────────────────────────────────── */}
         {step === CRIAR_STEP && method !== "ideia" && (
           loading ? (
             <div className="flex flex-col items-center justify-center py-32 space-y-6 animate-fade-in">
@@ -1183,6 +1261,74 @@ const CreateCreative = () => {
           ) : null
         )}
       </div>
+
+      {/* ── Refine Dialog ─────────────────────────────────────────────────── */}
+      <Dialog open={showRefineDialog} onOpenChange={setShowRefineDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-normal">Melhorar com IA</DialogTitle>
+            <DialogDescription>
+              Descreva o que deseja ajustar no briefing.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={refineInstruction}
+            onChange={(e) => setRefineInstruction(e.target.value)}
+            placeholder="Ex: Deixe o tom mais urgente, adicione elementos de escassez, mude o foco para o benefício X..."
+            rows={4}
+            className="resize-none"
+          />
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowRefineDialog(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="hero"
+              className="flex-1"
+              disabled={!refineInstruction.trim() || isRefining}
+              onClick={async () => {
+                setIsRefining(true);
+                setShowRefineDialog(false);
+                setFormattingIdea(true);
+                try {
+                  const { data, error } = await supabase.functions.invoke("format-idea", {
+                    body: {
+                      idea,
+                      objective,
+                      product: productName || selectedBrand?.name,
+                      cta: cta || undefined,
+                      current_idea: editableFormattedText,
+                      user_instruction: refineInstruction,
+                    },
+                  });
+                  if (error) throw error;
+                  if (data?.formatted) {
+                    const f: FormattedIdea = data.formatted;
+                    setEditableFormattedText(f.formatted_text ?? editableFormattedText);
+                    setFormattedIdea(f);
+                  }
+                  setRefineInstruction("");
+                } catch (err: any) {
+                  toast({ title: "Erro ao refinar", description: err.message, variant: "destructive" });
+                } finally {
+                  setIsRefining(false);
+                  setFormattingIdea(false);
+                }
+              }}
+            >
+              {isRefining ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Refinando...</>
+              ) : (
+                <><Sparkles className="h-4 w-4 mr-2" />Aplicar</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Image dialog ─────────────────────────────────────────────────── */}
       <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>

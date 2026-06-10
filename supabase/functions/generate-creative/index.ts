@@ -234,21 +234,17 @@ async function generateCaption(
       messages: [
         {
           role: "system",
-          content: `Você é especialista em copywriting para redes sociais. Gere uma legenda completa para postagem no Instagram/Facebook em português do Brasil, seguindo EXATAMENTE esta estrutura e ordem (não inclua os títulos das seções no texto final):
+          content: `Você é especialista em copywriting para redes sociais. Gere uma legenda completa para postagem no Instagram/Facebook em português do Brasil, seguindo EXATAMENTE esta estrutura:
 
-1. HEADLINE — frase de abertura impactante baseada na copy do anúncio
-(linha em branco)
-2. DOR — 1 a 2 frases identificando o problema/frustração do público
-(linha em branco)
-3. TRANSFORMAÇÃO — 1 a 2 frases mostrando a mudança concreta que o produto proporciona
-(linha em branco)
-4. BENEFÍCIOS — 3 a 4 benefícios principais, cada um em uma linha, com emoji relevante no início
-(linha em branco)
-5. CTA — use EXATAMENTE o texto de CTA fornecido; pode adicionar uma frase curta de urgência ou curiosidade antes ou depois, mas o texto original do CTA deve aparecer íntegro
-(linha em branco)
-6. HASHTAGS — 10 a 15 hashtags relevantes ao produto e nicho
+1) HEADLINE: frase de gancho forte e impactante que prende a atenção imediatamente (1 linha)
 
-Retorne APENAS o texto formatado, sem títulos de seção, sem numeração.`,
+2) DESENVOLVIMENTO: conteúdo persuasivo em 2-3 frases curtas que aprofundam a mensagem e criam conexão com o público
+
+3) CTA: chamada para ação clara e direta alinhada com o objetivo do post
+
+4) HASHTAGS: exatamente 5 hashtags relevantes ao nicho e produto, separadas por espaço
+
+A legenda deve fluir naturalmente entre as seções, sem rótulos ou títulos visíveis. Máximo 600 caracteres no total. Retorne APENAS o texto da legenda, sem explicações.`,
         },
         { role: "user", content: userContent },
       ],

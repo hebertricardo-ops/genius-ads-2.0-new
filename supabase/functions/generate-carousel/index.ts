@@ -375,7 +375,17 @@ Informações adicionais: ${extra_context || "Nenhuma"}
 
 REGRA DE CTA — INSTRUÇÃO CRÍTICA: O CTA base fornecido pelo usuário é INTOCÁVEL e deve aparecer LITERALMENTE no CTA do slide final. PROIBIDO substituir, parafrasear ou omitir qualquer palavra do CTA base. Formato obrigatório: [CTA BASE EXATO] + [complemento opcional com gatilho de urgência ou curiosidade]. EXEMPLO CORRETO (CTA base: "Clique em Saiba Mais"): ✅ "Clique em Saiba Mais e transforme sua criação de anúncios hoje" ✅ "Clique em Saiba Mais — seu próximo criativo leva 60 segundos" ✅ "Clique em Saiba Mais agora". EXEMPLO ERRADO — TERMINANTEMENTE PROIBIDO: ❌ "Clique e mude sua forma de fazer anúncios agora" ❌ "Descubra como criar anúncios em 60 segundos" ❌ Qualquer CTA que não comece com as palavras exatas do CTA base.
 
-REGRA DE LEGENDAS: Gere 1 legenda para a postagem do carrossel. Estrutura: 1) Gancho forte (primeira linha que prende atenção), 2) Desenvolvimento persuasivo (2-3 frases curtas), 3) CTA final. Máximo 280 caracteres.
+REGRA DE LEGENDAS: Gere 1 legenda completa e estruturada para a postagem do carrossel seguindo EXATAMENTE esta estrutura:
+
+1) HEADLINE: frase de gancho forte e impactante que prende a atenção imediatamente (1 linha)
+
+2) DESENVOLVIMENTO: conteúdo persuasivo em 2-3 frases curtas que aprofundam a mensagem e criam conexão com o público
+
+3) CTA: chamada para ação clara e direta alinhada com o objetivo do post
+
+4) HASHTAGS: exatamente 5 hashtags relevantes ao nicho e produto, separadas por espaço
+
+A legenda deve fluir naturalmente entre as seções, sem rótulos ou títulos visíveis. Máximo 600 caracteres no total.
 
 Agora gere a copy completa do carrossel.
 
@@ -426,7 +436,7 @@ LEMBRETE CRÍTICO — INSTRUÇÃO INVIOLÁVEL: O CTA do slide final DEVE começa
                 },
                 ad_caption: {
                   type: "string",
-                  description: "Legenda única para a postagem do carrossel. Estrutura: gancho + desenvolvimento persuasivo + CTA. Máximo 280 caracteres.",
+                  description: "Legenda estruturada para postagem do carrossel. Estrutura: headline impactante (1 linha) + desenvolvimento persuasivo (2-3 frases) + CTA + 5 hashtags relevantes. Máximo 600 caracteres.",
                 },
               },
               required: ["carousel_title", "slides_count", "credits_cost", "objective", "slides", "ad_caption"],

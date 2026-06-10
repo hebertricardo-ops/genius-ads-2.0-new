@@ -28,29 +28,59 @@ serve(async (req) => {
       } catch { /* ignore */ }
     }
 
-    const { idea, objective, product } = await req.json();
+    const { idea, objective, product, brand_context, cta, current_idea, user_instruction } = await req.json();
 
-    if (!idea?.trim()) {
+    if (!idea?.trim() && !current_idea?.trim()) {
       return new Response(
         JSON.stringify({ error: "Campo 'idea' é obrigatório" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const systemPrompt = `Você é um copywriter especialista em posts para redes sociais e anúncios digitais.
-Receba a ideia bruta do usuário e transforme em uma estrutura clara para criação de post, seguindo o objetivo informado.
-Retorne APENAS JSON válido sem markdown, sem explicações, sem texto adicional:
-{
-  "promise": "promessa principal extraída da ideia (1 frase objetiva e impactante)",
-  "pains": "dores identificadas na ideia (separadas por vírgula, no máximo 3)",
-  "benefits": "benefícios identificados na ideia (separados por vírgula, no máximo 3)",
-  "angle": "ângulo criativo sugerido para o post (1 frase descritiva)",
-  "summary": "resumo da ideia em 2-3 frases para o usuário revisar antes de continuar"
-}`;
+    const systemPrompt = `Você é um diretor de arte e copywriter especialista em criativos para redes sociais e Meta Ads.
 
-    const userMessage = `Produto: ${product || "Não informado"}
+Receba a ideia do usuário e transforme em um briefing criativo estruturado e detalhado para geração de um criativo visual profissional.
+${user_instruction ? `\nINSTRUÇÃO DE REFINAMENTO DO USUÁRIO: ${user_instruction}\nAplique esta instrução ao briefing atual fornecido.\n` : ""}
+Retorne OBRIGATORIAMENTE um JSON com EXATAMENTE esta estrutura:
+{
+  "formatted_text": "string com o briefing formatado em markdown conforme template",
+  "promise": "promessa principal em 1 frase",
+  "pains": "dores identificadas, separadas por vírgula",
+  "benefits": "benefícios identificados, separados por vírgula",
+  "angle": "ângulo criativo em 1 frase",
+  "headline": "headline do criativo",
+  "subheadline": "subheadline do criativo",
+  "development": "conteúdo do desenvolvimento (bullets ou texto curto)",
+  "cta_suggestion": "sugestão de CTA se não informado"
+}
+
+O campo "formatted_text" deve seguir EXATAMENTE este template:
+## Objetivo do Post ##
+[objetivo geral do post - este texto NÃO será usado na arte]
+
+## Layout Visual ##
+[descrição detalhada do layout previsto para a arte]
+
+## Conteúdo de Texto (renderizado no criativo) ##
+* Headline: [headline impactante]
+* Subheadline: [subheadline complementar]
+* Desenvolvimento: [desenvolvimento em bullets ou texto curto - máx 2-3 elementos]
+* CTA: [call to action visual]
+
+## Elementos Visuais ##
+[elementos visuais, ícones, texturas e composição sugeridos]
+
+Retorne APENAS o JSON, sem markdown, sem explicações.`;
+
+    const inputText = user_instruction && current_idea
+      ? `BRIEFING ATUAL:\n${current_idea}\n\nIDEIA ORIGINAL: ${idea || ""}`
+      : `Ideia do usuário: ${idea}`;
+
+    const userMessage = `Produto/Marca: ${product || "Não informado"}
 Objetivo do post: ${objective === "engajamento" ? "engajamento (curtidas, comentários, compartilhamentos)" : "venda (converter em cliente ou Meta ADS)"}
-Ideia do usuário: ${idea}`;
+${cta ? `CTA desejado: ${cta}` : ""}
+${brand_context ? `Contexto da marca: ${JSON.stringify(brand_context)}` : ""}
+${inputText}`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -65,7 +95,7 @@ Ideia do usuário: ${idea}`;
           { role: "user", content: userMessage },
         ],
         temperature: 0.7,
-        max_tokens: 600,
+        max_tokens: 900,
       }),
     });
 
@@ -104,7 +134,7 @@ Ideia do usuário: ${idea}`;
       });
     }
 
-    console.log("[format-idea] OK for product:", product);
+    console.log("[format-idea] OK for product:", product, "refine:", !!user_instruction);
 
     return new Response(
       JSON.stringify({ formatted }),

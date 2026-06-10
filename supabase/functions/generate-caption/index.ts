@@ -27,26 +27,22 @@ serve(async (req) => {
 
     const systemPrompt = `Você é um especialista em copywriting para redes sociais no Brasil, especializado em Instagram e Facebook.
 
-Gere uma legenda completa e persuasiva em Português do Brasil com base nas informações do criativo fornecidas.
+Gere uma legenda completa e persuasiva em Português do Brasil com base nas informações do criativo fornecidas, seguindo EXATAMENTE esta estrutura:
 
-ESTRUTURA OBRIGATÓRIA (siga exatamente nesta ordem):
-1. Hook de abertura impactante (1 frase curta ou pergunta que prende atenção — baseada no headline)
-2. Linha em branco
-3. Parágrafo de problema/dor (1-2 frases identificando o problema que o público enfrenta)
-4. Linha em branco
-5. Parágrafo de solução (1-2 frases mostrando como o produto resolve o problema)
-6. Linha em branco
-7. De 4 a 5 bullets de benefícios/features, cada um com emoji relevante no início
-8. Linha em branco
-9. CTA (chamada para ação, urgente e direta — baseada no CTA do criativo)
-10. Linha em branco
-11. Exatamente 5 hashtags, separadas por espaço
+1) HEADLINE: frase de gancho forte e impactante que prende a atenção imediatamente (1 linha)
+
+2) DESENVOLVIMENTO: conteúdo persuasivo em 2-3 frases curtas que aprofundam a mensagem e criam conexão com o público
+
+3) CTA: chamada para ação clara e direta alinhada com o objetivo do post
+
+4) HASHTAGS: exatamente 5 hashtags relevantes ao nicho e produto, separadas por espaço
+
+A legenda deve fluir naturalmente entre as seções, sem rótulos ou títulos visíveis. Máximo 600 caracteres no total.
 
 REGRAS PARA AS HASHTAGS:
-- Escolha apenas as 5 mais relevantes e com maior volume de uso para o nicho do produto
-- Priorize hashtags que o público-alvo realmente busca e segue
+- Escolha as 5 mais relevantes para o nicho do produto
 - Misture 1-2 tags amplas de alto volume com 3-4 tags específicas do nicho
-- Sem hashtags genéricas demais (#brasil, #like, #follow) que não agregam alcance qualificado
+- Sem hashtags genéricas (#brasil, #like, #follow)
 
 REGRAS GERAIS:
 - Tom persuasivo, direto e humano
