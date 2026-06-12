@@ -101,7 +101,10 @@ serve(async (req) => {
         const uc   = creditsMap.get(p.user_id) ?? {};
         const sub  = subsMap.get(p.user_id);
         const activeSub = sub?.status === "active" ? sub : null;
-        const total = ((uc.subscription_credits ?? 0) + (uc.extra_credits ?? 0));
+        const subscriptionTotal = (uc.subscription_credits ?? 0) + (uc.extra_credits ?? 0);
+        const total = subscriptionTotal > 0
+          ? subscriptionTotal
+          : (uc.credits_balance ?? 0);
         const avail = uc.credits_balance ?? 0;
 
         return {

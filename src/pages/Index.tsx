@@ -283,7 +283,7 @@ const Index = () => {
             </div>
             <div className="space-y-2 mb-6 flex-1">
               {[
-                "40 créditos para conhecer o Genius ADS",
+                "20 créditos para conhecer o Genius ADS",
                 "Até 2 marcas",
                 "Gere criativos e carrosséis",
               ].map((f) => (
