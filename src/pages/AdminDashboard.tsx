@@ -5,7 +5,9 @@ import { useSortableTable } from "@/hooks/useSortableTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, RefreshCw, Users, DollarSign, Image, BarChart2, Tag } from "lucide-react";
+import { ArrowLeft, RefreshCw, Users, DollarSign, Image, BarChart2, Tag, Star, StarOff, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
@@ -544,6 +546,264 @@ const AdminBrandsTab = ({ brands, isLoading }: { brands: any; isLoading: boolean
   );
 };
 
+// ─── Creatives Tab ────────────────────────────────────────────────────────────
+
+type AdminCreative = {
+  id:             string;
+  user_id:        string;
+  image_url:      string;
+  copy_data:      any;
+  created_at:     string;
+  is_featured:    boolean;
+  featured_at:    string | null;
+  featured_note:  string | null;
+  user_name:      string;
+  user_email:     string;
+};
+
+const AdminCreativesTab = ({
+  isLoading,
+  fetchSection,
+}: {
+  isLoading: boolean;
+  fetchSection: (s: any, p: any, extra?: Record<string, unknown>) => Promise<any>;
+}) => {
+  const [creatives, setCreatives]             = useState<AdminCreative[]>([]);
+  const [total, setTotal]                     = useState(0);
+  const [totalPages, setTotalPages]           = useState(0);
+  const [page, setPage]                       = useState(1);
+  const [onlyFeatured, setOnlyFeatured]       = useState(false);
+  const [localLoading, setLocalLoading]       = useState(false);
+  const [toggling, setToggling]               = useState<string | null>(null);
+  const [selectedCreative, setSelectedCreative] = useState<AdminCreative | null>(null);
+  const [featuredNote, setFeaturedNote]         = useState("");
+  const [isTogglingFeatured, setIsTogglingFeatured] = useState(false);
+
+  const load = async (p = page, of = onlyFeatured) => {
+    setLocalLoading(true);
+    try {
+      const res = await fetchSection("creatives", "all", { page: p, only_featured: of });
+      setCreatives(res?.creatives ?? []);
+      setTotal(res?.total ?? 0);
+      setTotalPages(res?.total_pages ?? 0);
+    } catch (err) {
+      console.error("AdminCreativesTab load error:", err);
+    } finally {
+      setLocalLoading(false);
+    }
+  };
+
+  useEffect(() => { load(page, onlyFeatured); }, [page, onlyFeatured]);
+
+  const toggleFeatured = async (c: AdminCreative) => {
+    setToggling(c.id);
+    try {
+      await fetchSection("toggle_featured", "all", {
+        creative_id:   c.id,
+        is_featured:   !c.is_featured,
+        featured_note: c.featured_note ?? null,
+      });
+      setCreatives((prev) =>
+        prev.map((x) => x.id === c.id
+          ? { ...x, is_featured: !x.is_featured, featured_at: !x.is_featured ? new Date().toISOString() : null }
+          : x
+        )
+      );
+    } catch (err) {
+      console.error("toggle_featured error:", err);
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  if (isLoading || localLoading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div key={i} className="aspect-square rounded-lg bg-muted animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">{total} criativos no total</span>
+          <Badge variant="outline">{creatives.filter((c) => c.is_featured).length} destacados nesta página</Badge>
+        </div>
+        <button
+          className={`text-sm px-3 py-1 rounded-md border transition-colors ${onlyFeatured ? "bg-amber-50 border-amber-300 text-amber-700" : "border-border text-muted-foreground hover:text-foreground"}`}
+          onClick={() => { setPage(1); setOnlyFeatured(!onlyFeatured); }}
+        >
+          <Star className="inline h-3.5 w-3.5 mr-1" />
+          {onlyFeatured ? "Ver todos" : "Só destacados"}
+        </button>
+      </div>
+
+      {creatives.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-8 text-center">Nenhum criativo encontrado.</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {creatives.map((c) => (
+            <div
+              key={c.id}
+              onClick={() => { setSelectedCreative(c); setFeaturedNote(c.featured_note ?? ""); }}
+              className="group relative cursor-pointer rounded-lg overflow-hidden border border-border bg-muted hover:border-primary/50 hover:shadow-md transition-all"
+            >
+              <img
+                src={c.image_url}
+                alt="Criativo"
+                className="w-full aspect-square object-cover"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex flex-col justify-between p-2 opacity-0 group-hover:opacity-100">
+                <div className="flex justify-end">
+                  <button
+                    className={`rounded-full p-1.5 transition-colors ${c.is_featured ? "bg-amber-400 text-white" : "bg-white/80 text-muted-foreground hover:text-amber-500"}`}
+                    onClick={(e) => { e.stopPropagation(); toggleFeatured(c); }}
+                    disabled={toggling === c.id}
+                    title={c.is_featured ? "Remover destaque" : "Destacar criativo"}
+                  >
+                    {c.is_featured
+                      ? <Star className="h-4 w-4 fill-current" />
+                      : <StarOff className="h-4 w-4" />
+                    }
+                  </button>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-white text-xs font-medium truncate">
+                    {c.copy_data?.headline ?? "—"}
+                  </p>
+                  <p className="text-white/70 text-[10px] truncate">
+                    {c.user_name !== "—" ? c.user_name : c.user_email}
+                  </p>
+                  <p className="text-white/50 text-[10px]">
+                    {new Date(c.created_at).toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+              </div>
+              {c.is_featured && (
+                <div className="absolute top-1.5 left-1.5 pointer-events-none">
+                  <Star className="h-4 w-4 text-amber-400 fill-amber-400 drop-shadow" />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <Button
+            size="sm" variant="outline"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {page} / {totalPages}
+          </span>
+          <Button
+            size="sm" variant="outline"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={!!selectedCreative} onOpenChange={() => setSelectedCreative(null)}>
+        <DialogContent className="sm:max-w-lg">
+          {selectedCreative && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <span className="text-sm font-bold text-primary">
+                    {selectedCreative.user_name?.[0]?.toUpperCase() ?? "?"}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{selectedCreative.user_name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{selectedCreative.user_email}</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl overflow-hidden border border-border bg-muted flex items-center justify-center">
+                <img
+                  src={selectedCreative.image_url}
+                  alt="Criativo"
+                  className="w-full object-contain max-h-80"
+                />
+              </div>
+
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span>
+                  {new Date(selectedCreative.created_at).toLocaleDateString("pt-BR", {
+                    day: "2-digit", month: "short", year: "numeric",
+                    hour: "2-digit", minute: "2-digit",
+                  })}
+                </span>
+                <span>{selectedCreative.credits_used} crédito{selectedCreative.credits_used !== 1 ? "s" : ""}</span>
+              </div>
+
+              <div className="border border-border rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Destacar para vitrine</p>
+                    <p className="text-xs text-muted-foreground">Aparece na seção de inspirações dos usuários</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={selectedCreative.is_featured ? "default" : "outline"}
+                    className={selectedCreative.is_featured ? "bg-amber-500 hover:bg-amber-600 text-white shrink-0" : "shrink-0"}
+                    disabled={isTogglingFeatured}
+                    onClick={async () => {
+                      setIsTogglingFeatured(true);
+                      try {
+                        await fetchSection("toggle_featured", "all", {
+                          creative_id:   selectedCreative.id,
+                          is_featured:   !selectedCreative.is_featured,
+                          featured_note: featuredNote,
+                        });
+                        const updated = {
+                          ...selectedCreative,
+                          is_featured:   !selectedCreative.is_featured,
+                          featured_note: featuredNote,
+                        };
+                        setSelectedCreative(updated);
+                        setCreatives((prev) => prev.map((x) => x.id === updated.id ? updated : x));
+                      } catch (err) {
+                        console.error("toggle_featured error:", err);
+                      } finally {
+                        setIsTogglingFeatured(false);
+                      }
+                    }}
+                  >
+                    {isTogglingFeatured
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : selectedCreative.is_featured ? "Destacado" : "Destacar"
+                    }
+                  </Button>
+                </div>
+                <Input
+                  placeholder="Anotação interna (ex: ótima qualidade, moda)"
+                  value={featuredNote}
+                  onChange={(e) => setFeaturedNote(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
 // ─── AdminDashboard ───────────────────────────────────────────────────────────
 
 const AdminDashboard = () => {
@@ -633,6 +893,9 @@ const AdminDashboard = () => {
             <TabsTrigger value="brands">
               <Tag className="h-4 w-4 mr-2" /> Marcas
             </TabsTrigger>
+            <TabsTrigger value="creatives">
+              <Star className="h-4 w-4 mr-2" /> Criativos
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-4">
@@ -646,6 +909,9 @@ const AdminDashboard = () => {
           </TabsContent>
           <TabsContent value="brands" className="mt-4">
             <AdminBrandsTab brands={brands} isLoading={isLoading} />
+          </TabsContent>
+          <TabsContent value="creatives" className="mt-4">
+            <AdminCreativesTab isLoading={isLoading} fetchSection={fetchSection} />
           </TabsContent>
         </Tabs>
       </div>

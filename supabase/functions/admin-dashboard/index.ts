@@ -52,7 +52,9 @@ serve(async (req) => {
     if (authError || !user) return json({ error: "Não autenticado" }, 401);
     if (user.email !== ADMIN_EMAIL) return json({ error: "Acesso não autorizado" }, 403);
 
-    const { section, period } = await req.json();
+    const body_raw = await req.json();
+    const { section, period } = body_raw;
+    const extra = (body_raw.extra ?? {}) as Record<string, unknown>;
     const interval = getInterval(period);
 
     // OVERVIEW
@@ -238,6 +240,84 @@ serve(async (req) => {
         by_user: Object.values(byUserMap),
         total:   enriched.length,
       });
+    }
+
+    // CREATIVES
+    if (section === "creatives") {
+      const page: number     = Number(extra.page ?? 1);
+      const perPage          = 30;
+      const offset           = (page - 1) * perPage;
+      const onlyFeatured     = extra.only_featured === true;
+      const filterUserId     = (extra.user_id as string | null) ?? null;
+
+      let query = supabaseAdmin
+        .from("generated_creatives")
+        .select(
+          "id, image_url, credits_used, is_featured, " +
+          "featured_at, featured_note, created_at, user_id, " +
+          "brand_id, copy_data",
+          { count: "exact" }
+        )
+        .order("created_at", { ascending: false })
+        .range(offset, offset + perPage - 1);
+
+      if (onlyFeatured) query = query.eq("is_featured", true);
+      if (filterUserId) query = query.eq("user_id", filterUserId);
+      if (period !== "all") {
+        query = query.gte(
+          "created_at",
+          new Date(Date.now() - parsePeriodToMs(period)).toISOString()
+        );
+      }
+
+      const { data: creatives, count } = await query;
+
+      if (!creatives?.length) {
+        return json({ creatives: [], total: 0, page, total_pages: 0 });
+      }
+
+      // PASSO 2 — buscar profiles dos user_ids únicos
+      const userIds = [...new Set(creatives.map((c) => c.user_id))];
+      const { data: profiles } = await supabaseAdmin
+        .from("profiles")
+        .select("user_id, name, email")
+        .in("user_id", userIds);
+
+      const profileMap = new Map(
+        (profiles ?? []).map((p) => [p.user_id, p])
+      );
+
+      // PASSO 3 — enriquecer criativos com dados do perfil
+      const enriched = creatives.map((c) => ({
+        ...c,
+        user_name:  profileMap.get(c.user_id)?.name  ?? "—",
+        user_email: profileMap.get(c.user_id)?.email ?? "—",
+      }));
+
+      return json({
+        creatives:   enriched,
+        total:       count ?? 0,
+        page,
+        total_pages: Math.ceil((count ?? 0) / perPage),
+      });
+    }
+
+    // TOGGLE_FEATURED
+    if (section === "toggle_featured") {
+      const { creative_id, is_featured: feat, featured_note: note } = extra as any;
+      if (!creative_id) return json({ error: "creative_id obrigatório" }, 400);
+
+      const { error } = await supabaseAdmin
+        .from("generated_creatives")
+        .update({
+          is_featured:   feat,
+          featured_at:   feat ? new Date().toISOString() : null,
+          featured_note: note ?? null,
+        })
+        .eq("id", creative_id);
+
+      if (error) throw error;
+      return json({ ok: true });
     }
 
     // FAL_USAGE

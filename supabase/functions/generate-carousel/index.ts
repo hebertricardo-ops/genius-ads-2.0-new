@@ -590,27 +590,6 @@ async function handleImagesWithFal(
           cost_usd:         calcFalCost("square_hd"),
         });
 
-        if (userId) {
-          const { error: insertError } = await supabaseAdmin
-            .from("generated_creatives")
-            .insert({
-              user_id: userId,
-              image_url: storageUrl,
-              fal_request_id: falRequestId ?? null,
-              copy_data: {
-                headline: slide.headline,
-                body: slide.subtext,
-                cta: slide.cta,
-                slide_number: slide.slide_number,
-                slide_role: slide.slide_role,
-              },
-              credits_used: 0,
-            });
-          if (insertError) {
-            console.error(`Failed to insert slide ${slide.slide_number} into generated_creatives:`, insertError);
-          }
-        }
-
         success = true;
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
         console.log(`[fal.ai] Slide ${i + 1}/${numSlides} generated in ${elapsed}s`);
@@ -950,24 +929,25 @@ async function handleSingleImageWithFal(
         cost_usd:         calcFalCost("square_hd"),
       });
 
+      // Deduzir créditos após geração bem-sucedida
       if (userId) {
-        const { error: insertError } = await supabaseAdmin
-          .from("generated_creatives")
-          .insert({
-            user_id: userId,
-            image_url: storageUrl,
-            fal_request_id: falRequestId ?? null,
-            copy_data: {
-              headline: slide.headline,
-              body: slide.subtext,
-              cta: slide.cta,
-              slide_number: slide.slide_number,
-              slide_role: slide.slide_role,
-            },
-            credits_used: 0,
+        const CREDITS_PER_SLIDE = 10;
+        const { data: deductResult, error: deductError } = await supabaseAdmin.rpc("deduct_credits", {
+          p_user_id: userId,
+          p_amount:  CREDITS_PER_SLIDE,
+        });
+        if (deductError) {
+          console.error("[carousel] Erro ao deduzir créditos:", deductError);
+        } else if (!deductResult?.success) {
+          console.error("[carousel] deduct_credits retornou falha:", deductResult?.error);
+        } else {
+          await supabaseAdmin.from("credit_transactions").insert({
+            user_id:     userId,
+            type:        "usage",
+            amount:      -CREDITS_PER_SLIDE,
+            description: `Slide de carrossel gerado: ${product_name ?? "Carrossel"} (slide ${slide.slide_number})`,
           });
-        if (insertError) {
-          console.error(`Failed to insert slide ${slide.slide_number} into generated_creatives:`, insertError);
+          console.log(`[carousel] Deducted ${CREDITS_PER_SLIDE} credits from user ${userId} (slide ${slide.slide_number})`);
         }
       }
 
