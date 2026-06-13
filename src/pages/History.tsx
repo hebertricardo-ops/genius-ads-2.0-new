@@ -772,7 +772,7 @@ const History = () => {
 
       {/* Creative Detail Dialog */}
       <Dialog open={!!selectedCreative} onOpenChange={(open) => !open && setSelectedCreative(null)}>
-        <DialogContent className="max-w-xl p-0 max-h-[92vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-xl p-0 max-h-[90vh] overflow-y-auto overflow-x-hidden">
           {selectedCreative && (() => {
             const info = getRequestInfo(selectedCreative);
             const copyData = selectedCreative.copy_data as any;
@@ -808,7 +808,7 @@ const History = () => {
                 <div className="p-5 space-y-4">
                   <div>
                     {headline && (
-                      <h2 className="text-xl font-display text-foreground leading-tight mb-1">{headline}</h2>
+                      <h2 className="text-xl font-display text-foreground leading-tight mb-1 break-words overflow-hidden">{headline}</h2>
                     )}
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Clock className="w-3 h-3" />
@@ -922,7 +922,7 @@ const History = () => {
                   </div>
 
                   {/* Action buttons */}
-                  <div className="flex items-center gap-1.5 pt-2 border-t border-border">
+                  <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border">
                     <Button variant="outline" size="sm" className="text-xs px-2.5 h-8" onClick={() => setSelectedCreative(null)}>
                       Voltar
                     </Button>
@@ -1008,7 +1008,7 @@ const History = () => {
 
       {/* Carousel Detail Dialog */}
       <Dialog open={!!selectedCarousel} onOpenChange={(open) => !open && setSelectedCarousel(null)}>
-        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           {selectedCarousel && (() => {
             const req = carouselRequestsMap[selectedCarousel.requestId];
             return (
@@ -1163,7 +1163,7 @@ const History = () => {
                   />
                 </div>
 
-                <div className="flex items-center gap-1.5 pt-4 border-t border-border mt-2">
+                <div className="flex flex-wrap items-center gap-1.5 pt-4 border-t border-border mt-2">
                   <Button variant="outline" size="sm" className="text-xs px-2.5 h-8" onClick={() => setSelectedCarousel(null)}>
                     Fechar
                   </Button>
