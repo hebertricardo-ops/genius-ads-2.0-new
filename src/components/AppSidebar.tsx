@@ -35,7 +35,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import CreateDialog from "@/components/CreateDialog";
 import NoBrandDialog from "@/components/NoBrandDialog";
 import { useBrandContext } from "@/contexts/BrandContext";
 import UpgradeDialog from "@/components/UpgradeDialog";
@@ -45,7 +44,6 @@ export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const closeMobileIfNeeded = () => { if (isMobile) setOpenMobile(false); };
-  const [createOpen, setCreateOpen] = useState(false);
   const [noBrandOpen, setNoBrandOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<"calendar" | "social_media" | "brands">("brands");
@@ -221,7 +219,7 @@ export function AppSidebar() {
               {/* Criar */}
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => { closeMobileIfNeeded(); selectedBrand ? setCreateOpen(true) : setNoBrandOpen(true); }}
+                  onClick={() => { closeMobileIfNeeded(); selectedBrand ? navigate("/create-select") : setNoBrandOpen(true); }}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer",
                     "text-white bg-primary border border-primary hover:bg-primary/90 hover:shadow-sm",
@@ -394,7 +392,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <CreateDialog open={createOpen} onOpenChange={setCreateOpen} />
         <NoBrandDialog open={noBrandOpen} onOpenChange={setNoBrandOpen} />
         <UpgradeDialog
           open={upgradeOpen}

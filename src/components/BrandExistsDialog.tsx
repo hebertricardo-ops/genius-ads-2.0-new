@@ -59,9 +59,13 @@ const BrandExistsDialog = ({
             Sair e entrar com outra conta →
           </Button>
           <Button
-            variant="ghost"
-            className="w-full text-sm text-muted-foreground"
-            onClick={onClose}
+            variant="outline"
+            className="w-full text-sm min-h-[44px]"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
           >
             Usar outro nome para a marca
           </Button>

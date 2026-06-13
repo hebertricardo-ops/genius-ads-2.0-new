@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import CreateCreative from "./pages/CreateCreative";
 import CreateCarousel from "./pages/CreateCarousel";
+import CreateSelect from "./pages/CreateSelect";
 import CreativeResults from "./pages/CreativeResults";
 import CarouselResults from "./pages/CarouselResults";
 import History from "./pages/History";
@@ -67,6 +68,7 @@ const App = () => (
             <Route path="/email-confirmation" element={<EmailConfirmation />} />
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/dashboard" element={<ProtectedWithLayout><Dashboard /></ProtectedWithLayout>} />
+            <Route path="/create-select" element={<ProtectedWithLayout><CreateSelect /></ProtectedWithLayout>} />
             <Route path="/create" element={<ProtectedWithLayout><CreateCreative /></ProtectedWithLayout>} />
             <Route path="/create-carousel" element={<ProtectedWithLayout><CreateCarousel /></ProtectedWithLayout>} />
             <Route path="/results/:requestId" element={<ProtectedWithLayout><CreativeResults /></ProtectedWithLayout>} />

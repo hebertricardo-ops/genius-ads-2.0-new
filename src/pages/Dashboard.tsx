@@ -218,7 +218,7 @@ const Dashboard = () => {
               <CalendarDays className="w-4 h-4" />
               Agendamento
             </Button>
-            <Button variant="hero" size="sm" onClick={() => navigate("/create")} className="gap-1.5">
+            <Button variant="hero" size="sm" onClick={() => navigate("/create-select")} className="gap-1.5">
               <Plus className="w-4 h-4" />
               Criar Post
             </Button>
