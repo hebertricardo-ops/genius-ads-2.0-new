@@ -571,7 +571,7 @@ const BrandSetup = () => {
       } else {
         await createBrand.mutateAsync({ ...brandData, is_active: true });
         toast({ title: "Marca configurada com sucesso!" });
-        navigate("/dashboard");
+        navigate("/dashboard", { state: { showOnboarding: true } });
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.message.startsWith("BRAND_NAME_TAKEN:")) {

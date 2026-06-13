@@ -1,6 +1,10 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Sparkles, ArrowRight, Lightbulb, ImageIcon, Building2, CalendarDays, Plus, Clock, LayoutGrid } from "lucide-react";
+import OnboardingDashboardDialog from "@/components/OnboardingDashboardDialog";
+import logoIcon from "@/assets/logo-icon.png";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,10 +18,27 @@ import { cn } from "@/lib/utils";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { data: credits } = useCredits();
-  const { selectedBrand, isLoading: brandLoading } = useBrandContext();
+  const { selectedBrand, brands, isLoading: brandLoading } = useBrandContext();
   const hasBrand = !!selectedBrand;
+
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.showOnboarding) {
+      setTimeout(() => setShowOnboarding(true), 800);
+      window.history.replaceState({}, "", "/dashboard");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!brandLoading && brands.length === 0) {
+      setShowWelcome(true);
+    }
+  }, [brandLoading, brands]);
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
@@ -184,6 +205,43 @@ const Dashboard = () => {
 
   return (
     <div>
+      <Dialog open={showWelcome} onOpenChange={() => {}}>
+        <DialogContent
+          className="sm:max-w-sm mx-4 [&>button]:hidden"
+          onPointerDownOutside={e => e.preventDefault()}
+          onEscapeKeyDown={e => e.preventDefault()}
+        >
+          <div className="flex flex-col items-center text-center space-y-5 py-2">
+            <img src={logoIcon} alt="Genius ADS" className="w-20 h-20 object-contain" />
+            <div className="space-y-2">
+              <h2 className="text-xl font-display font-normal text-foreground">
+                Bem-vindo ao Genius ADS! 🎉
+              </h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Primeiro, vamos criar o perfil da sua marca, produto ou serviço.
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                É bem rápido e você só precisa fazer uma vez.
+              </p>
+            </div>
+            <Button
+              className="w-full gradient-primary min-h-[48px] text-base"
+              onClick={() => { setShowWelcome(false); navigate("/brands/new"); }}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Criar minha marca
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Leva menos de 2 minutos ⚡
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <OnboardingDashboardDialog
+        open={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+      />
       <div className="max-w-5xl mx-auto px-4 py-8">
 
         {/* ── Top bar ── */}
