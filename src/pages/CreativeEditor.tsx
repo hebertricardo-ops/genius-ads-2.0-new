@@ -372,6 +372,7 @@ const CreativeEditor = () => {
   const [inputValue, setInputValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"canvas" | "chat">("canvas");
 
   // Anexo de imagem no chat
   const [attachedImage, setAttachedImage] = useState<File | null>(null);
@@ -547,6 +548,26 @@ const CreativeEditor = () => {
         </div>
       </div>
 
+      {/* Toggle de abas — apenas no mobile */}
+      <div className="flex md:hidden border-b border-border shrink-0">
+        <button
+          onClick={() => setMobileTab("canvas")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+            mobileTab === "canvas" ? "text-primary border-b-2 border-primary" : "text-muted-foreground"
+          }`}
+        >
+          🖼️ Criativo
+        </button>
+        <button
+          onClick={() => setMobileTab("chat")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+            mobileTab === "chat" ? "text-primary border-b-2 border-primary" : "text-muted-foreground"
+          }`}
+        >
+          💬 Editar com IA
+        </button>
+      </div>
+
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
         {/* Elements panel — hidden on mobile */}
@@ -558,8 +579,8 @@ const CreativeEditor = () => {
           />
         </div>
 
-        {/* Canvas */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Canvas — esconde no mobile quando aba 'chat' */}
+        <div className={`flex-1 flex flex-col overflow-hidden ${mobileTab === "chat" ? "hidden md:flex" : "flex"}`}>
           <CanvasPanel
             imageUrl={currentImageUrl}
             isLoading={isLoading}
@@ -567,8 +588,10 @@ const CreativeEditor = () => {
           />
         </div>
 
-        {/* Chat panel */}
-        <div className="w-72 shrink-0 flex flex-col">
+        {/* Chat panel — no mobile ocupa tela toda quando aba 'chat' */}
+        <div className={`shrink-0 border-l border-border flex flex-col md:w-72 ${
+          mobileTab === "canvas" ? "hidden md:flex" : "flex w-full"
+        }`}>
           {/* Input oculto para seleção de arquivo */}
           <input
             ref={fileInputRef}

@@ -126,3 +126,13 @@
     background-clip: text;
   }
 }
+
+/* Previne redimensionamento de viewport pelo teclado virtual no mobile */
+@supports (height: 100dvh) {
+  .min-h-screen {
+    min-height: 100dvh;
+  }
+  .h-screen {
+    height: 100dvh;
+  }
+}

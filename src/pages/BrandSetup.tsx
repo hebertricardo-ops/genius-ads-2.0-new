@@ -593,179 +593,154 @@ const BrandSetup = () => {
   // ─── Step renders ──────────────────────────────────
 
   const renderStep0 = () => (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       <div className="text-center">
         <h1 className="text-3xl font-display text-foreground mb-2">Como você quer configurar sua marca?</h1>
         <p className="text-muted-foreground">Escolha o método que preferir para começar</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          {
-            key: "manual" as const,
-            icon: PenLine,
-            title: "Preencher Manualmente",
-            desc: "Preencho tudo eu mesmo",
-          },
-          {
-            key: "website" as const,
-            icon: Globe,
-            title: "Informar URL do Site",
-            desc: "Cole a URL do seu site",
-          },
-          {
-            key: "instagram" as const,
-            icon: Instagram,
-            title: "Informar Instagram",
-            desc: "Cole o @usuario ou link do perfil",
-          },
-        ].map(({ key, icon: Icon, title, desc }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => { setMethod(key); setScrapeError(null); }}
-            className={cn(
-              "gradient-card rounded-xl border-2 p-6 text-left transition-all duration-200 hover:border-primary/50",
-              method === key ? "border-primary bg-primary/10" : "border-border"
-            )}
-          >
-            <Icon className={cn("w-8 h-8 mb-4", method === key ? "text-primary" : "text-muted-foreground")} />
-            <p className="font-display text-foreground mb-1">{title}</p>
-            <p className="text-sm text-muted-foreground">{desc}</p>
-          </button>
-        ))}
-      </div>
-
-      {/* Website input */}
-      {method === "website" && (
-        <div className="gradient-card rounded-xl border border-border p-6 space-y-4 animate-fade-in">
-          <div className="flex items-start gap-3">
-            <Globe className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-            <div>
-              <p className="font-display text-foreground text-sm">Informe a URL do seu site</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                Vamos ler seu site e preencher os campos automaticamente. Você poderá revisar tudo antes de salvar.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Input
-              placeholder="https://meusite.com.br"
-              value={websiteUrl}
-              onChange={e => { setWebsiteUrl(e.target.value); setScrapeError(null); }}
-              disabled={isScraping}
-              onKeyDown={e => e.key === "Enter" && !isScraping && websiteUrl.trim() && handleScrape()}
-            />
-            <Button
-              onClick={handleScrape}
-              disabled={!websiteUrl.trim() || isScraping}
-            >
-              {isScraping ? <Loader2 className="w-4 h-4 animate-spin" /> : "Analisar"}
-            </Button>
-          </div>
-
-          {isScraping && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
-              <span className="animate-pulse">{scrapeLoadingMsg}</span>
-            </div>
+        {/* Manual — vai direto para o próximo passo */}
+        <button
+          type="button"
+          onClick={() => { setMethod("manual"); setScrapeError(null); setStep(1); }}
+          className={cn(
+            "gradient-card rounded-xl border-2 p-6 text-left transition-all duration-200 hover:border-primary/50",
+            method === "manual" ? "border-primary bg-primary/10" : "border-border"
           )}
+        >
+          <PenLine className={cn("w-8 h-8 mb-4", method === "manual" ? "text-primary" : "text-muted-foreground")} />
+          <p className="font-display text-foreground mb-1">Preencher Manualmente</p>
+          <p className="text-sm text-muted-foreground">Preencho tudo eu mesmo</p>
+        </button>
 
-          {scrapeError && (
-            <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-lg p-3">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{scrapeError}</span>
-            </div>
+        {/* Website — expande campo inline */}
+        <button
+          type="button"
+          onClick={() => { setMethod("website"); setScrapeError(null); }}
+          className={cn(
+            "gradient-card rounded-xl border-2 p-6 text-left transition-all duration-200 hover:border-primary/50",
+            method === "website" ? "border-primary bg-primary/10" : "border-border"
           )}
-        </div>
-      )}
+        >
+          <Globe className={cn("w-8 h-8 mb-4", method === "website" ? "text-primary" : "text-muted-foreground")} />
+          <p className="font-display text-foreground mb-1">Informar URL do Site</p>
+          <p className="text-sm text-muted-foreground">Cole a URL do seu site</p>
 
-      {/* Instagram input */}
-      {method === "instagram" && (
-        <div className="gradient-card rounded-xl border border-border p-6 space-y-4 animate-fade-in">
-          <div className="flex items-start gap-3">
-            <Instagram className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-            <div>
-              <p className="font-display text-foreground text-sm">Informe o perfil do Instagram</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                Vamos analisar os posts e bio do perfil para preencher os campos automaticamente.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Input
-              placeholder="@seuperfil ou https://instagram.com/seuperfil"
-              value={instagramHandle}
-              onChange={e => { setInstagramHandle(e.target.value); setScrapeInstagramError(null); }}
-              disabled={isScrapingInstagram}
-              onKeyDown={e => e.key === "Enter" && !isScrapingInstagram && instagramHandle.trim() && handleScrapeInstagram()}
-            />
-            <Button
-              onClick={handleScrapeInstagram}
-              disabled={!instagramHandle.trim() || isScrapingInstagram}
-            >
-              {isScrapingInstagram ? <Loader2 className="w-4 h-4 animate-spin" /> : "Analisar"}
-            </Button>
-          </div>
-
-          {isScrapingInstagram && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
-              <span className="animate-pulse">{instagramLoadingMsg}</span>
-            </div>
-          )}
-
-          {scrapeInstagramError && (
-            <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-lg p-3">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{scrapeInstagramError}</span>
-            </div>
-          )}
-
-          {instagramProfile && !isScrapingInstagram && (
-            <div className="flex items-center gap-4 p-4 rounded-xl border border-primary/30 bg-primary/5 animate-fade-in">
-              {instagramProfile.profile_pic_url ? (
-                <img
-                  src={instagramProfile.profile_pic_url}
-                  alt={instagramProfile.full_name}
-                  className="w-14 h-14 rounded-full border border-border object-cover shrink-0"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                />
-              ) : (
-                <div className="w-14 h-14 rounded-full border border-border bg-primary/20 flex items-center justify-center shrink-0">
-                  <Instagram className="w-6 h-6 text-primary" />
+          {method === "website" && (
+            <div className="mt-3 w-full space-y-2" onClick={e => e.stopPropagation()}>
+              <Input
+                placeholder="https://seusite.com.br"
+                value={websiteUrl}
+                onChange={e => { setWebsiteUrl(e.target.value); setScrapeError(null); }}
+                className="text-sm"
+                type="url"
+                autoFocus
+                disabled={isScraping}
+                onKeyDown={e => e.key === "Enter" && !isScraping && websiteUrl.trim() && handleScrape()}
+              />
+              {isScraping && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin text-primary shrink-0" />
+                  <span className="animate-pulse">{scrapeLoadingMsg}</span>
                 </div>
               )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{instagramProfile.full_name}</p>
-                <p className="text-xs text-muted-foreground">@{instagramProfile.username}</p>
-                <p className="text-xs text-muted-foreground">{instagramProfile.followers.toLocaleString("pt-BR")} seguidores</p>
-                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                  <Check className="w-3 h-3" />
-                  Perfil identificado com sucesso
-                </p>
-              </div>
-              <Button variant="hero" size="sm" onClick={applyInstagramData} className="shrink-0">
-                Usar este perfil
-                <ArrowRight className="w-4 h-4" />
+              {scrapeError && (
+                <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded-lg p-2">
+                  <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                  <span>{scrapeError}</span>
+                </div>
+              )}
+              <Button
+                className="w-full gradient-primary"
+                onClick={handleScrape}
+                disabled={!websiteUrl.trim() || isScraping}
+              >
+                {isScraping ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Analisando...</>
+                ) : (
+                  "Analisar Site →"
+                )}
               </Button>
             </div>
           )}
-        </div>
-      )}
+        </button>
 
-      <div className="flex justify-end">
-        <Button
-          variant="hero"
-          size="lg"
-          disabled={method !== "manual"}
-          onClick={() => method === "manual" && setStep(1)}
+        {/* Instagram — expande campo inline */}
+        <button
+          type="button"
+          onClick={() => { setMethod("instagram"); setScrapeInstagramError(null); }}
+          className={cn(
+            "gradient-card rounded-xl border-2 p-6 text-left transition-all duration-200 hover:border-primary/50",
+            method === "instagram" ? "border-primary bg-primary/10" : "border-border"
+          )}
         >
-          Continuar
-          <ArrowRight className="w-4 h-4" />
-        </Button>
+          <Instagram className={cn("w-8 h-8 mb-4", method === "instagram" ? "text-primary" : "text-muted-foreground")} />
+          <p className="font-display text-foreground mb-1">Informar Instagram</p>
+          <p className="text-sm text-muted-foreground">Cole o @usuario ou link do perfil</p>
+
+          {method === "instagram" && (
+            <div className="mt-3 w-full space-y-2" onClick={e => e.stopPropagation()}>
+              <Input
+                placeholder="@suamarca ou instagram.com/suamarca"
+                value={instagramHandle}
+                onChange={e => { setInstagramHandle(e.target.value); setScrapeInstagramError(null); }}
+                className="text-sm"
+                autoFocus
+                disabled={isScrapingInstagram}
+                onKeyDown={e => e.key === "Enter" && !isScrapingInstagram && instagramHandle.trim() && handleScrapeInstagram()}
+              />
+              {isScrapingInstagram && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin text-primary shrink-0" />
+                  <span className="animate-pulse">{instagramLoadingMsg}</span>
+                </div>
+              )}
+              {scrapeInstagramError && (
+                <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded-lg p-2">
+                  <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                  <span>{scrapeInstagramError}</span>
+                </div>
+              )}
+              {instagramProfile && !isScrapingInstagram && (
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-primary/30 bg-primary/5 animate-fade-in">
+                  {instagramProfile.profile_pic_url ? (
+                    <img
+                      src={instagramProfile.profile_pic_url}
+                      alt={instagramProfile.full_name}
+                      className="w-10 h-10 rounded-full border border-border object-cover shrink-0"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full border border-border bg-primary/20 flex items-center justify-center shrink-0">
+                      <Instagram className="w-5 h-5 text-primary" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">{instagramProfile.full_name}</p>
+                    <p className="text-[10px] text-muted-foreground">@{instagramProfile.username} · {instagramProfile.followers.toLocaleString("pt-BR")} seguidores</p>
+                    <p className="text-[10px] text-green-600 mt-0.5 flex items-center gap-1">
+                      <Check className="w-2.5 h-2.5" />Perfil identificado
+                    </p>
+                  </div>
+                </div>
+              )}
+              <Button
+                className="w-full gradient-primary"
+                onClick={instagramProfile ? applyInstagramData : handleScrapeInstagram}
+                disabled={(!instagramHandle.trim() && !instagramProfile) || isScrapingInstagram}
+              >
+                {isScrapingInstagram ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Analisando...</>
+                ) : instagramProfile ? (
+                  <>Usar este perfil <ArrowRight className="h-4 w-4 ml-2" /></>
+                ) : (
+                  "Analisar Instagram →"
+                )}
+              </Button>
+            </div>
+          )}
+        </button>
       </div>
     </div>
   );

@@ -136,7 +136,7 @@ export function AppSidebar() {
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="right" align="start" className="w-56">
+            <DropdownMenuContent side="bottom" align="start" className="w-56 max-h-[60vh] overflow-y-auto">
               {brands.length > 0 && (
                 <>
                   <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
