@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Plus, Images, Coins, CalendarDays, Smartphone,
   UserCircle, CreditCard, HeadphonesIcon, LogOut, Sun, Moon, Monitor, ChevronUp,
@@ -9,7 +9,7 @@ import { usePlan } from "@/hooks/usePlan";
 import logoFull from "@/assets/logo-full.png";
 import logoIcon from "@/assets/logo-icon.png";
 import { NavLink } from "@/components/NavLink";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useCredits } from "@/hooks/useCredits";
 import { useTheme } from "next-themes";
@@ -44,6 +44,11 @@ export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const closeMobileIfNeeded = () => { if (isMobile) setOpenMobile(false); };
+  const location = useLocation();
+
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [location.pathname]);
   const [noBrandOpen, setNoBrandOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<"calendar" | "social_media" | "brands">("brands");
