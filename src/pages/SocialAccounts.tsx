@@ -308,15 +308,15 @@ const SocialAccounts = () => {
                     <div
                       key={value}
                       className={cn(
-                        "flex items-center gap-4 px-4 py-4 rounded-xl border transition-colors",
+                        "flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-4 rounded-xl border transition-colors",
                         active ? bg : "border-border bg-muted/20",
                       )}
                     >
                       <Icon className={cn("w-5 h-5 shrink-0", active ? color : "text-muted-foreground")} />
-                      <span className={cn("flex-1 text-sm font-medium", active ? "text-foreground" : "text-muted-foreground")}>
+                      <span className={cn("flex-1 min-w-0 text-sm font-medium", active ? "text-foreground" : "text-muted-foreground")}>
                         {label}
                       </span>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 ml-auto shrink-0">
                         <span className={cn(
                           "flex items-center gap-1.5 text-xs font-medium",
                           active ? "text-green-500" : "text-muted-foreground",
