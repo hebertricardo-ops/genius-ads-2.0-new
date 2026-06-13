@@ -1313,6 +1313,10 @@ const BrandSetup = () => {
       open={showBrandExists}
       onClose={() => setShowBrandExists(false)}
       brandName={takenBrandName}
+      onGoToNameStep={() => {
+        setShowBrandExists(false);
+        setStep(2);
+      }}
     />
     <div className="max-w-3xl mx-auto px-4 py-10">
       {/* Header */}

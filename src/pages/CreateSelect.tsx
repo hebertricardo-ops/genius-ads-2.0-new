@@ -73,11 +73,11 @@ const CreateSelect = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Criativo Estático */}
         <button
           onClick={() => handleTypeSelect("creative")}
-          className="rounded-2xl bg-card text-left transition-all active:scale-[0.98] overflow-hidden flex flex-col hover:shadow-md shadow-sm"
+          className="w-full rounded-2xl bg-card text-left transition-all active:scale-[0.98] overflow-hidden flex flex-col hover:shadow-md shadow-sm"
         >
           <div className="relative bg-orange-50 dark:bg-orange-950/20 px-6 pt-8 pb-4 flex items-center justify-center min-h-[160px]">
             <span className="absolute top-3 right-3 text-[11px] font-normal bg-primary text-white rounded-full px-2.5 py-0.5 flex items-center gap-1">
@@ -114,7 +114,7 @@ const CreateSelect = () => {
         {/* Carrossel */}
         <button
           onClick={() => handleTypeSelect("carousel")}
-          className="rounded-2xl bg-card text-left transition-all active:scale-[0.98] overflow-hidden flex flex-col hover:shadow-md shadow-sm"
+          className="w-full rounded-2xl bg-card text-left transition-all active:scale-[0.98] overflow-hidden flex flex-col hover:shadow-md shadow-sm"
         >
           <div className="relative bg-purple-50 dark:bg-purple-950/20 px-6 pt-8 pb-4 flex items-center justify-center min-h-[160px]">
             <span className="absolute top-3 right-3 text-[11px] font-normal bg-purple-600 text-white rounded-full px-2.5 py-0.5 flex items-center gap-1">

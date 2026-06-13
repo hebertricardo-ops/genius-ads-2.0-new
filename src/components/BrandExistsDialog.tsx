@@ -6,13 +6,14 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 interface BrandExistsDialogProps {
-  open:      boolean;
-  onClose:   () => void;
-  brandName: string;
+  open:             boolean;
+  onClose:          () => void;
+  brandName:        string;
+  onGoToNameStep?:  () => void;
 }
 
 const BrandExistsDialog = ({
-  open, onClose, brandName,
+  open, onClose, brandName, onGoToNameStep,
 }: BrandExistsDialogProps) => {
   const navigate = useNavigate();
 
@@ -64,7 +65,7 @@ const BrandExistsDialog = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              onClose();
+              onGoToNameStep ? onGoToNameStep() : onClose();
             }}
           >
             Usar outro nome para a marca
