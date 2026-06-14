@@ -4,7 +4,7 @@
 **Repositório:** genius-ads-2.0 (GitHub)
 **Supabase Project Ref:** lovhzzlmuhjtbblnstfw
 **URL de Produção:** https://adsgenius.com.br
-**Última atualização:** 01 de junho de 2026
+**Última atualização:** 13 de junho de 2026
 
 ---
 
@@ -195,6 +195,20 @@
 - CTASelector com 11 opções pré-definidas
 - Histórico de edições carregado do banco no Editor IA
 
+### Mobile — Melhorias (jun/2026)
+- `/create-select` redesenhado: grid 2 colunas (mobile empilhado, desktop lado-a-lado), cards ilustrados com badge IA, cores laranja/roxo, sem bordas
+- Onboarding em 2 etapas: (1) Welcome Dialog modal com logo bloqueante para usuários sem marca; (2) OnboardingDashboardDialog exibido 800ms após criar primeira marca
+- `BrandExistsDialog` — "Usar outro nome" navega de volta ao step de nome no BrandSetup
+- `BrandSetup` — cards de método com inputs inline (website/Instagram); sem botão "Continuar" separado; navegação direta ao clicar
+- `AppSidebar` — seletor de marca abre para baixo (`side="bottom"`) no mobile
+- `AppSidebar` — sidebar fecha automaticamente ao navegar via `useEffect` em `location.pathname` (cobre NavLinks, dropdowns, itens de upgrade)
+- `Stepper` — tamanhos responsivos (`w-7 h-7 md:w-9 md:h-9`, gaps menores no mobile)
+- `CreativeEditor` — layout com abas no mobile ("🖼️ Criativo" / "💬 Editar com IA") para evitar overflow horizontal
+- `History` dialogs — containment de largura (`w-[calc(100vw-2rem)]`), `overflow-x-hidden`, `flex-wrap` nos botões de ação, `break-words` no headline
+- `SocialAccounts` — botão "Desconectar" não vaza horizontalmente (flex-wrap + ml-auto no grupo de status)
+- `index.css` — `font-size: 16px !important` em inputs/textarea/select no mobile (previne zoom automático iOS)
+- `index.css` — `min-height: 100dvh` / `height: 100dvh` via `@supports` (previne compressão pelo teclado virtual)
+
 ---
 
 ## Rotas do Frontend
@@ -209,6 +223,7 @@
 | /welcome | Welcome | Pública |
 | /change-password | ChangePassword | Protegida |
 | /dashboard | Dashboard | Protegida + sidebar |
+| /create-select | CreateSelect | Protegida + sidebar |
 | /create | CreateCreative | Protegida + sidebar |
 | /create-carousel | CreateCarousel | Protegida + sidebar |
 | /editor/:id | CreativeEditor | Protegida (sem sidebar) |

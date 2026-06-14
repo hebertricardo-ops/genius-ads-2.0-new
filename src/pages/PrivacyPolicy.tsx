@@ -11,6 +11,7 @@ interface Section {
 const sections: Section[] = [
   { id: "bem-vindo",            label: "Bem-Vindo" },
   { id: "coleta-uso",           label: "Como Nós Coletamos e Usamos Informações" },
+  { id: "dados-google",         label: "Dados do Google — Login Social" },
   { id: "compartilhamento",     label: "Compartilhamento das Suas Informações" },
   { id: "mudanca-controle",     label: "O que acontece caso haja alguma mudança no controle" },
   { id: "armazenamento",        label: "Como Nós Armazenamos e Protegemos Suas Informações" },
@@ -166,6 +167,82 @@ export default function PrivacyPolicy() {
                   <p className="font-semibold text-foreground mb-1">Comunicações comerciais e de marketing</p>
                   <p>Usamos as informações que coletamos, como seu endereço de e-mail, para nos comunicarmos diretamente com você. Podemos enviar e-mails contendo newsletters, promoções e ofertas especiais. Se não quiser recebê-los, você terá a opção de se descadastrar a qualquer momento enviando um e-mail para <a href="mailto:contato@adsgenius.com.br" className="text-primary underline">contato@adsgenius.com.br</a> ou seguindo as instruções de cancelamento presentes no corpo da comunicação recebida.</p>
                   <p className="mt-3">Também usamos suas informações para enviar e-mails relacionados ao Serviço — como verificação de conta, confirmações de cobrança, atualizações de funcionalidades e avisos técnicos e de segurança. Não é possível cancelar o recebimento desses tipos de e-mail.</p>
+                </div>
+              </div>
+            </section>
+
+            {/* Dados do Google */}
+            <section id="dados-google" className="scroll-mt-24 space-y-4">
+              <h2 className="text-xl font-display text-foreground mb-4">Dados do Google — Login Social</h2>
+              <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
+                <p>
+                  O Genius ADS oferece a opção de login com sua conta Google (Google OAuth). Ao utilizar
+                  esta funcionalidade, acessamos exclusivamente os dados listados abaixo, conforme permitido
+                  pelos escopos básicos de perfil do Google.
+                </p>
+                <div>
+                  <p className="font-semibold text-foreground mb-2">Dados acessados via Google:</p>
+                  <ul className="list-disc list-inside space-y-2">
+                    <li>
+                      <strong className="text-foreground">Endereço de e-mail</strong> — utilizado para
+                      criar e identificar sua conta no Genius ADS. Armazenado em nosso banco de dados
+                      para autenticação e comunicações do serviço.
+                    </li>
+                    <li>
+                      <strong className="text-foreground">Nome completo</strong> — utilizado para
+                      personalizar a exibição do seu perfil dentro do aplicativo. Armazenado em nosso
+                      banco de dados.
+                    </li>
+                    <li>
+                      <strong className="text-foreground">Foto de perfil (avatar)</strong> — utilizada
+                      como imagem de identificação visual no aplicativo. Armazenada como URL de referência.
+                    </li>
+                    <li>
+                      <strong className="text-foreground">Identificador único do Google (ID)</strong> —
+                      utilizado internamente pelo sistema de autenticação (Supabase Auth) para vincular
+                      sua conta ao provedor Google de forma segura.
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground mb-2">O que NÃO acessamos:</p>
+                  <p>
+                    O Genius ADS <strong className="text-foreground">não acessa</strong> dados do Gmail,
+                    Google Drive, Google Contacts, Google Calendar, histórico de navegação, localização,
+                    contatos ou qualquer outra informação além do perfil básico descrito acima.
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground mb-2">Uso dos dados do Google:</p>
+                  <ul className="list-disc list-inside space-y-2">
+                    <li>Os dados são usados exclusivamente para criar e manter sua conta no Genius ADS.</li>
+                    <li>
+                      Não compartilhamos dados do Google com terceiros, exceto o provedor de infraestrutura
+                      (Supabase) que hospeda nosso banco de dados com segurança.
+                    </li>
+                    <li>Os dados do Google não são usados para fins publicitários ou de rastreamento.</li>
+                    <li>
+                      Você pode revogar o acesso a qualquer momento nas configurações de segurança da sua
+                      conta Google em{" "}
+                      <a
+                        href="https://myaccount.google.com/permissions"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        myaccount.google.com/permissions
+                      </a>
+                      .
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground mb-2">Base legal:</p>
+                  <p>
+                    O acesso aos dados do Google ocorre mediante seu consentimento explícito no momento
+                    do login social, em conformidade com a Política de Dados do Usuário dos Serviços de
+                    API do Google e a LGPD (Lei Geral de Proteção de Dados — Lei nº 13.709/2018).
+                  </p>
                 </div>
               </div>
             </section>

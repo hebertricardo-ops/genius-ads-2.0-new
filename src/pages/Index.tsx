@@ -269,39 +269,7 @@ const Index = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-
-          {/* Card Free — primeiro da esquerda */}
-          <div className="gradient-card rounded-2xl p-7 border border-border shadow-card flex flex-col relative">
-            <div className="mb-4">
-              <h3 className="font-display text-foreground text-xl mb-1">Free</h3>
-              <p className="text-xs text-muted-foreground">Para quem quer experimentar antes de assinar</p>
-            </div>
-            <div className="mb-5">
-              <p className="text-2xl font-display text-foreground">R$ 0,00</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Sem cartão de crédito</p>
-            </div>
-            <div className="space-y-2 mb-6 flex-1">
-              {[
-                "20 créditos para conhecer o Genius ADS",
-                "Até 2 marcas",
-                "Gere criativos e carrosséis",
-              ].map((f) => (
-                <div key={f} className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                  <span className="text-xs text-muted-foreground">{f}</span>
-                </div>
-              ))}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs border-0 bg-primary/10 text-primary hover:bg-primary/20"
-              onClick={() => navigate("/signup")}
-            >
-              Comece Grátis →
-            </Button>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
           {SUBSCRIPTION_PLANS.map((plan) => {
             const price = billingAnnual ? plan.annualPrice / 12 : plan.monthlyPrice;
@@ -364,6 +332,22 @@ const Index = () => {
         </p>
       </section>
 
+      {/* Garantia de 7 Dias — entre planos e seção "Vamos ser diretos" */}
+      <div className="max-w-5xl mx-auto px-4">
+        <div className="flex flex-col items-center text-center bg-zinc-900 border border-zinc-700 rounded-2xl px-8 py-8 max-w-xl mx-auto mt-8 mb-4">
+          <span className="text-4xl mb-3">🛡️</span>
+          <h3 className="text-white text-xl mb-2">Garantia de 7 Dias — Risco Zero</h3>
+          <p className="text-zinc-400 text-sm leading-relaxed">
+            Se você comprar qualquer pacote e sentir que o Genius ADS não era o que esperava,
+            é só me chamar em até 7 dias. Devolvo 100% do seu dinheiro.
+            Sem burocracia, sem perguntas.
+          </p>
+          <p className="text-orange-400 mt-3 text-sm">
+            Você não tem nada a perder — só criativos a ganhar.
+          </p>
+        </div>
+      </div>
+
       {/* DOBRA 8 — Custo de não comprar */}
       <section className="max-w-3xl mx-auto px-4 py-16">
         <h2 className="text-2xl md:text-3xl font-display text-foreground mb-10 text-center">
@@ -424,12 +408,15 @@ const Index = () => {
           <h2 className="text-2xl md:text-3xl font-display text-foreground mb-4">
             Comece agora com o <span className="text-gradient">Genius ADS</span>
           </h2>
-          <p className="text-muted-foreground mb-2">🆓 Teste grátis com 40 créditos — sem cartão de crédito, sem compromisso</p>
-          <p className="text-muted-foreground mb-8">Crie até 6 criativos completos gratuitamente e veja o Genius ADS trabalhando por você.</p>
+          <p className="text-muted-foreground mb-2">🆓 Teste grátis com 20 créditos — sem cartão de crédito, sem compromisso</p>
+          <p className="text-muted-foreground mb-8">Crie até 2 criativos completos gratuitamente e veja o Genius ADS trabalhando por você.</p>
           <Button variant="hero" size="lg" onClick={() => navigate("/signup")}>
             COMECE AGORA GRÁTIS
             <ArrowRight className="w-5 h-5" />
           </Button>
+          <p className="text-zinc-500 text-xs text-center mt-3">
+            🛡️ Compra protegida por <span className="text-zinc-300 font-medium">7 dias de garantia total</span>. Não gostou? Devolvemos tudo, sem perguntas.
+          </p>
         </div>
 
         <h2 className="text-2xl font-display text-foreground mb-8 text-center">

@@ -9,7 +9,9 @@ export type AdminSection =
   | "brands"
   | "fal_usage"
   | "creatives"
-  | "toggle_featured";
+  | "toggle_featured"
+  | "campaigns"
+  | "campaign_logs";
 
 export type AdminPeriod = "24h" | "7d" | "30d" | "all";
 

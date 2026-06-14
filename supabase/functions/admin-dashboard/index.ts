@@ -334,6 +334,30 @@ serve(async (req) => {
       return json({ fal_official: falData });
     }
 
+    // CAMPAIGNS
+    if (section === "campaigns") {
+      const { data, error } = await supabaseAdmin
+        .from("email_campaigns")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return json({ campaigns: data ?? [] });
+    }
+
+    // CAMPAIGN_LOGS
+    if (section === "campaign_logs") {
+      const campaign_id = (extra.campaign_id as string) ?? null;
+      if (!campaign_id) return json({ error: "campaign_id obrigatório" }, 400);
+      const { data, error } = await supabaseAdmin
+        .from("email_campaign_logs")
+        .select("*")
+        .eq("campaign_id", campaign_id)
+        .order("sent_at", { ascending: false });
+      if (error) throw error;
+      return json({ logs: data ?? [] });
+    }
+
     return json({ error: `Seção inválida: ${section}` }, 400);
   } catch (e) {
     console.error("[admin-dashboard] error:", e);

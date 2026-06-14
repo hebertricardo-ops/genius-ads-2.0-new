@@ -5,7 +5,8 @@ import { useSortableTable } from "@/hooks/useSortableTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, RefreshCw, Users, DollarSign, Image, BarChart2, Tag, Star, StarOff, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Users, DollarSign, Image, BarChart2, Tag, Star, StarOff, ChevronLeft, ChevronRight, Loader2, Send } from "lucide-react";
+import CampaignTab from "@/components/admin/CampaignTab";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
@@ -896,6 +897,9 @@ const AdminDashboard = () => {
             <TabsTrigger value="creatives">
               <Star className="h-4 w-4 mr-2" /> Criativos
             </TabsTrigger>
+            <TabsTrigger value="campaigns">
+              <Send className="h-4 w-4 mr-2" /> Campanhas
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-4">
@@ -912,6 +916,9 @@ const AdminDashboard = () => {
           </TabsContent>
           <TabsContent value="creatives" className="mt-4">
             <AdminCreativesTab isLoading={isLoading} fetchSection={fetchSection} />
+          </TabsContent>
+          <TabsContent value="campaigns" className="mt-4">
+            <CampaignTab users={users} fetchSection={fetchSection} />
           </TabsContent>
         </Tabs>
       </div>
