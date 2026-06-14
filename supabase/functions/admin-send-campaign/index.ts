@@ -75,74 +75,75 @@ serve(async (req) => {
     if (campaignError || !campaign) throw campaignError ?? new Error("Erro ao criar campanha");
 
     const campaignId = campaign.id;
-    let sentCount  = 0;
-    let errorCount = 0;
 
-    // Disparar para cada destinatário
-    for (const recipient of recipients) {
-      const interpolated = message.replace(/\{\{nome\}\}/gi, recipient.name ?? "");
+    // Montar array com mensagens já interpoladas por destinatário
+    const recipientsPayload = recipients.map((r) => ({
+      nome:        r.name,
+      email:       r.email,
+      whatsapp:    r.whatsapp ?? null,
+      subject:     subject ?? null,
+      mensagem:    message.replace(/\{\{nome\}\}/gi, r.name ?? ""),
+      canal:       channel,
+      campaign_id: campaignId,
+    }));
 
-      const webhookPayload = {
-        nome:        recipient.name,
-        email:       recipient.email,
-        whatsapp:    recipient.whatsapp ?? null,
-        subject:     subject ?? null,
-        mensagem:    interpolated,
-        canal:       channel,
-        campaign_id: campaignId,
-      };
-
-      let logStatus = "sent";
-      let logError: string | null = null;
-
-      try {
-        const res = await fetch(n8nUrl, {
-          method:  "POST",
-          headers: {
-            "Content-Type":  "application/json",
-            "Authorization": `Bearer ${webhookSecret}`,
-          },
-          body: JSON.stringify(webhookPayload),
-        });
-
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          throw new Error(`N8N retornou ${res.status}: ${text}`);
-        }
-
-        sentCount++;
-      } catch (err) {
-        logStatus = "error";
-        logError  = err instanceof Error ? err.message : String(err);
-        errorCount++;
-      }
-
-      await supabaseAdmin.from("email_campaign_logs").insert({
-        campaign_id:   campaignId,
-        user_id:       recipient.user_id,
-        user_email:    recipient.email,
-        user_name:     recipient.name,
-        user_whatsapp: recipient.whatsapp ?? null,
-        channel,
-        status:        logStatus,
-        error_message: logError,
+    // Disparar UMA única requisição ao N8N com todos os destinatários
+    let dispatchError: string | null = null;
+    try {
+      const res = await fetch(n8nUrl, {
+        method:  "POST",
+        headers: {
+          "Content-Type":      "application/json",
+          "Authorization":     `Bearer ${webhookSecret}`,
+          "X-Campaign-Channel": channel,
+        },
+        body: JSON.stringify({ recipients: recipientsPayload }),
       });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`N8N retornou ${res.status}: ${text}`);
+      }
+    } catch (err) {
+      dispatchError = err instanceof Error ? err.message : String(err);
     }
 
-    // Atualizar status final da campanha
-    const finalStatus = errorCount === 0 ? "done" : "partial_error";
+    if (dispatchError) {
+      await supabaseAdmin
+        .from("email_campaigns")
+        .update({ status: "partial_error" })
+        .eq("id", campaignId);
+
+      return json({ error: `Falha ao contatar N8N: ${dispatchError}` }, 502);
+    }
+
+    // Registrar logs por destinatário (status 'sent' — N8N processa de forma assíncrona)
+    const logs = recipients.map((r) => ({
+      campaign_id:   campaignId,
+      user_id:       r.user_id,
+      user_email:    r.email,
+      user_name:     r.name,
+      user_whatsapp: r.whatsapp ?? null,
+      channel,
+      status:        "sent",
+    }));
+
+    await supabaseAdmin.from("email_campaign_logs").insert(logs);
+
+    // Atualizar status final
     await supabaseAdmin
       .from("email_campaigns")
-      .update({ status: finalStatus })
+      .update({ status: "done" })
       .eq("id", campaignId);
 
     return json({
       campaign_id: campaignId,
       total:       recipients.length,
-      sent:        sentCount,
-      errors:      errorCount,
-      status:      finalStatus,
+      sent:        recipients.length,
+      errors:      0,
+      status:      "done",
     });
+
   } catch (e) {
     console.error("[admin-send-campaign] error:", e);
     return json({ error: e instanceof Error ? e.message : "Erro interno" }, 500);
