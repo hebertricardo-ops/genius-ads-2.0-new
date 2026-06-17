@@ -24,7 +24,7 @@ import {
 import {
   ChevronLeft, ChevronRight, Plus, Sparkles, Loader2, Filter,
   Instagram, Facebook, Pencil, Trash2, CalendarDays, X, CheckCircle2,
-  LayoutGrid, CalendarRange,
+  LayoutGrid, CalendarRange, AlertTriangle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSocialPublish } from "@/hooks/useSocialPublish";
@@ -152,6 +152,7 @@ const Calendario = () => {
   const [editingPost, setEditingPost] = useState<any | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [eventError, setEventError] = useState("");
   const [detailPost, setDetailPost] = useState<any | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -330,6 +331,7 @@ const Calendario = () => {
 
   const openNew = (date?: Date) => {
     setEditingPost(null);
+    setEventError("");
     setForm({
       ...emptyForm,
       scheduled_date: date ? format(date, "yyyy-MM-dd") : "",
@@ -340,6 +342,7 @@ const Calendario = () => {
   const openEdit = (post: any) => {
     setDetailPost(null);
     setEditingPost(post);
+    setEventError("");
     setForm({
       title: post.title,
       description: post.description ?? "",
@@ -376,22 +379,23 @@ const Calendario = () => {
 
   const handleSave = async () => {
     if (!form.title.trim()) {
-      toast({ title: "Preencha o título", variant: "destructive" });
+      setEventError("Preencha o título.");
       return;
     }
     if (!form.publish_now) {
       if (!form.scheduled_date) {
-        toast({ title: "Informe a data de agendamento", variant: "destructive" });
+        setEventError("Informe a data de agendamento.");
         return;
       }
       if (form.scheduled_time) {
         const scheduledDt = new Date(`${form.scheduled_date}T${form.scheduled_time}:00`);
         if (scheduledDt <= new Date()) {
-          toast({ title: "Selecione uma data e hora futuras", variant: "destructive" });
+          setEventError("Selecione uma data e hora futuras.");
           return;
         }
       }
     }
+    setEventError("");
 
     setSaving(true);
     try {
@@ -481,7 +485,7 @@ const Calendario = () => {
       queryClient.invalidateQueries({ queryKey: ["calendar-posts"] });
       setDialogOpen(false);
     } catch (err: any) {
-      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+      setEventError(err.message ?? "Erro ao salvar. Tente novamente.");
     } finally {
       setSaving(false);
     }
@@ -853,7 +857,7 @@ const Calendario = () => {
                 id="cal-title"
                 placeholder="Ex: Post de lançamento do produto"
                 value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                onChange={(e) => { setForm((f) => ({ ...f, title: e.target.value })); setEventError(""); }}
               />
             </div>
 
@@ -1104,6 +1108,13 @@ const Calendario = () => {
               />
             </div>
           </div>
+
+          {eventError && (
+            <div className="flex items-start gap-2.5 rounded-xl bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{eventError}</span>
+            </div>
+          )}
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>

@@ -10,10 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
-  Loader2, Instagram, Facebook, CheckCircle2, CalendarDays, Send,
+  Loader2, Instagram, Facebook, CheckCircle2, CalendarDays, Send, AlertTriangle,
 } from "lucide-react";
 import { useSocialPublish } from "@/hooks/useSocialPublish";
-import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -49,7 +48,6 @@ const SocialPublishModal = ({
 }: SocialPublishModalProps) => {
   const navigate = useNavigate();
   const { socialProfile, publishCreative } = useSocialPublish();
-  const { toast } = useToast();
 
   const connectedPlatforms: string[] = socialProfile?.connected_platforms ?? [];
   const availablePlatforms = connectedPlatforms.length > 0
@@ -66,11 +64,13 @@ const SocialPublishModal = ({
   const [scheduleTime, setScheduleTime] = useState("12:00");
   const [publishing, setPublishing] = useState(false);
   const [success, setSuccess] = useState<SuccessResult | null>(null);
+  const [publishError, setPublishError] = useState("");
 
   const togglePlatform = (platform: string) => {
     setSelectedPlatforms((prev) =>
       prev.includes(platform) ? prev.filter((p) => p !== platform) : [...prev, platform],
     );
+    setPublishError("");
   };
 
   const scheduledForISO = useMemo(() => {
@@ -83,26 +83,27 @@ const SocialPublishModal = ({
 
   const handlePublish = async () => {
     if (selectedPlatforms.length === 0) {
-      toast({ title: "Selecione ao menos uma plataforma", variant: "destructive" });
+      setPublishError("Selecione ao menos uma plataforma.");
       return;
     }
     if (!caption.trim()) {
-      toast({ title: "A legenda não pode estar vazia", variant: "destructive" });
+      setPublishError("A legenda não pode estar vazia.");
       return;
     }
     if (mode === "schedule") {
       if (!scheduleDate) {
-        toast({ title: "Informe a data de agendamento", variant: "destructive" });
+        setPublishError("Informe a data de agendamento.");
         return;
       }
       const scheduledDate = new Date(scheduleDate);
       const [h, m] = scheduleTime.split(":").map(Number);
       scheduledDate.setHours(h, m, 0, 0);
       if (scheduledDate <= new Date()) {
-        toast({ title: "A data de agendamento deve ser futura", variant: "destructive" });
+        setPublishError("A data de agendamento deve ser futura.");
         return;
       }
     }
+    setPublishError("");
 
     setPublishing(true);
     try {
@@ -127,11 +128,7 @@ const SocialPublishModal = ({
         calendarEntryId: result.calendar_entry_id,
       });
     } catch (err: any) {
-      toast({
-        title: "Erro ao publicar",
-        description: err.message ?? "Tente novamente.",
-        variant: "destructive",
-      });
+      setPublishError(err.message ?? "Erro ao publicar. Tente novamente.");
     } finally {
       setPublishing(false);
     }
@@ -145,6 +142,7 @@ const SocialPublishModal = ({
     setScheduleDate(undefined);
     setCalendarOpen(false);
     setScheduleTime("12:00");
+    setPublishError("");
     onClose();
   };
 
@@ -253,7 +251,7 @@ const SocialPublishModal = ({
             </div>
             <Textarea
               value={caption}
-              onChange={(e) => setCaption(e.target.value.slice(0, CAPTION_MAX))}
+              onChange={(e) => { setCaption(e.target.value.slice(0, CAPTION_MAX)); setPublishError(""); }}
               rows={4}
               placeholder="Legenda do post..."
               className="resize-none text-sm"
@@ -270,7 +268,7 @@ const SocialPublishModal = ({
                   name="pub-mode"
                   value="now"
                   checked={mode === "now"}
-                  onChange={() => setMode("now")}
+                  onChange={() => { setMode("now"); setPublishError(""); }}
                   className="accent-primary"
                 />
                 <span className="text-sm text-foreground">Publicar agora</span>
@@ -281,7 +279,7 @@ const SocialPublishModal = ({
                   name="pub-mode"
                   value="schedule"
                   checked={mode === "schedule"}
-                  onChange={() => setMode("schedule")}
+                  onChange={() => { setMode("schedule"); setPublishError(""); }}
                   className="accent-primary"
                 />
                 <span className="text-sm text-foreground">Agendar para...</span>
@@ -309,7 +307,7 @@ const SocialPublishModal = ({
                     <Calendar
                       mode="single"
                       selected={scheduleDate}
-                      onSelect={(d) => { setScheduleDate(d); setCalendarOpen(false); }}
+                      onSelect={(d) => { setScheduleDate(d); setCalendarOpen(false); setPublishError(""); }}
                       disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
                       locale={ptBR}
                       initialFocus
@@ -326,6 +324,13 @@ const SocialPublishModal = ({
             )}
           </div>
         </div>
+
+        {publishError && (
+          <div className="flex items-start gap-2.5 rounded-xl bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{publishError}</span>
+          </div>
+        )}
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={handleClose} disabled={publishing}>

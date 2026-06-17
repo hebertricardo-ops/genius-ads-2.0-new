@@ -147,6 +147,7 @@ const BrandSetup = () => {
   // UI state
   const [saving, setSaving] = useState(false);
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
+  const [stepError, setStepError] = useState("");
   const [showBrandExists, setShowBrandExists] = useState(false);
   const [takenBrandName, setTakenBrandName] = useState("");
 
@@ -244,10 +245,11 @@ const BrandSetup = () => {
     }
     if (errors.length > 0) {
       setInvalidFields(errors);
-      toast({ title: "Preencha os campos obrigatórios para continuar", variant: "destructive" });
+      setStepError("Preencha todos os campos obrigatórios para continuar.");
       return false;
     }
     setInvalidFields([]);
+    setStepError("");
     return true;
   };
 
@@ -286,10 +288,12 @@ const BrandSetup = () => {
   const toggleTone = (tone: string) => {
     if (toneOfVoice.includes(tone)) {
       setToneOfVoice(prev => prev.filter(t => t !== tone));
+      setStepError("");
     } else if (toneOfVoice.length >= 3) {
-      toast({ title: "Selecione no máximo 3 tons", variant: "destructive" });
+      setStepError("Selecione no máximo 3 tons de voz.");
     } else {
       setToneOfVoice(prev => [...prev, tone]);
+      setStepError("");
     }
   };
 
@@ -1409,6 +1413,12 @@ const BrandSetup = () => {
 
       {/* Step content */}
       <div className="gradient-card rounded-xl border border-border shadow-card p-6 md:p-8">
+        {stepError && (
+          <div className="flex items-start gap-2.5 rounded-xl bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive mb-4">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{stepError}</span>
+          </div>
+        )}
         {stepContent[step]?.()}
       </div>
 

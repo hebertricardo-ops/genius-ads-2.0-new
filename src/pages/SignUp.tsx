@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Eye, EyeOff, ArrowRight, Loader2 } from "lucide-react";
+import { AlertTriangle, Eye, EyeOff, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 import EmailExistsDialog from "@/components/EmailExistsDialog";
 import WhatsappExistsDialog from "@/components/WhatsappExistsDialog";
 import logoFull from "@/assets/logo-full.png";
@@ -29,9 +28,10 @@ const SignUp = () => {
 
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  const [formError, setFormError] = useState("");
+
   const { user, signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   useEffect(() => {
     if (user) navigate("/dashboard", { replace: true });
@@ -41,25 +41,25 @@ const SignUp = () => {
     e.preventDefault();
 
     if (!name.trim()) {
-      toast({ title: "Nome obrigatório", description: "Informe seu nome completo.", variant: "destructive" });
+      setFormError("O nome é obrigatório.");
       return;
     }
     if (password.length < 6) {
-      toast({ title: "Senha fraca", description: "A senha deve ter pelo menos 6 caracteres.", variant: "destructive" });
+      setFormError("A senha deve ter pelo menos 6 caracteres.");
       return;
     }
     if (password !== confirmPassword) {
-      toast({ title: "Senhas diferentes", description: "A confirmação de senha não confere.", variant: "destructive" });
+      setFormError("As senhas não coincidem.");
       return;
     }
     if (!acceptTerms) {
-      toast({ title: "Termos obrigatórios", description: "Aceite os termos para continuar.", variant: "destructive" });
+      setFormError("Você precisa aceitar os Termos de Uso para continuar.");
       return;
     }
 
     const rawWhatsapp = whatsapp.replace(/\D/g, "");
     if (rawWhatsapp.length < 10) {
-      toast({ title: "WhatsApp inválido", description: "Informe DDI + DDD + número com pelo menos 10 dígitos.", variant: "destructive" });
+      setFormError("Informe o WhatsApp com DDI + DDD + número.");
       return;
     }
 
@@ -92,7 +92,7 @@ const SignUp = () => {
         const msg = error.message.includes("already registered")
           ? "Este e-mail já está cadastrado."
           : error.message;
-        toast({ title: "Erro ao criar conta", description: msg, variant: "destructive" });
+        setFormError(msg ?? "Erro ao criar conta. Tente novamente.");
       } else {
         supabase.functions.invoke("notify-new-user", {
           body: { name, email, whatsapp: rawWhatsapp },
@@ -139,7 +139,7 @@ const SignUp = () => {
               type="text"
               placeholder="Seu nome"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); setFormError(""); }}
               required
               autoComplete="name"
               className="h-9 text-sm"
@@ -154,7 +154,7 @@ const SignUp = () => {
               type="email"
               placeholder="seu@email.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); setFormError(""); }}
               required
               autoComplete="email"
               className="h-9 text-sm"
@@ -175,6 +175,7 @@ const SignUp = () => {
                 if (digits.length > 4) formatted = `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4)}`;
                 else if (digits.length > 2) formatted = `${digits.slice(0, 2)} ${digits.slice(2)}`;
                 setWhatsapp(formatted);
+                setFormError("");
               }}
               required
               autoComplete="tel"
@@ -192,7 +193,7 @@ const SignUp = () => {
                 type={showPassword ? "text" : "password"}
                 placeholder="Mínimo 6 caracteres"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setFormError(""); }}
                 required
                 autoComplete="new-password"
                 className="h-9 text-sm pr-9"
@@ -217,7 +218,7 @@ const SignUp = () => {
                 type={showConfirm ? "text" : "password"}
                 placeholder="Repita a senha"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => { setConfirmPassword(e.target.value); setFormError(""); }}
                 required
                 autoComplete="new-password"
                 className="h-9 text-sm pr-9"
@@ -255,6 +256,13 @@ const SignUp = () => {
             </label>
           </div>
 
+          {formError && (
+            <div className="flex items-start gap-2.5 rounded-xl bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
+
           {/* Botão principal */}
           <Button
             type="submit"
@@ -290,7 +298,7 @@ const SignUp = () => {
             setGoogleLoading(true);
             const { error } = await signInWithGoogle();
             if (error) {
-              toast({ title: "Erro ao entrar com Google", description: error.message, variant: "destructive" });
+              setFormError("Não foi possível entrar com o Google. Tente novamente.");
               setGoogleLoading(false);
             }
           }}
