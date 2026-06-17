@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import logoFull from "@/assets/logo-full.png";
 import bgSignUp from "@/assets/background-signup.png";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -46,6 +46,7 @@ const Auth = () => {
   const [existingEmail, setExistingEmail] = useState("");
   const [showWhatsappExists, setShowWhatsappExists] = useState(false);
   const [existingWhatsapp, setExistingWhatsapp] = useState("");
+  const [loginError, setLoginError] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, signIn, signUp, signInWithGoogle, resetPasswordForEmail } = useAuth();
@@ -92,7 +93,7 @@ const Auth = () => {
             navigate("/email-confirmation", { state: { email } });
             return;
           }
-          toast({ title: "Erro ao entrar", description: mapLoginError(error.message), variant: "destructive" });
+          setLoginError(mapLoginError(error.message));
         } else {
           navigate("/dashboard");
         }
@@ -212,12 +213,12 @@ const Auth = () => {
             )}
             <div className="space-y-1">
               <Label htmlFor="email" className="text-xs">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" className="h-9 text-sm" required />
+              <Input id="email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setLoginError(""); }} placeholder="seu@email.com" className="h-9 text-sm" required />
             </div>
             <div className="space-y-1">
               <Label htmlFor="password" className="text-xs">Senha</Label>
               <div className="relative">
-                <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="h-9 text-sm pr-9" required />
+                <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => { setPassword(e.target.value); setLoginError(""); }} placeholder="••••••••" className="h-9 text-sm pr-9" required />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
                   {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
@@ -232,6 +233,12 @@ const Auth = () => {
                 >
                   Esqueci minha senha
                 </button>
+              </div>
+            )}
+            {loginError && (
+              <div className="flex items-start gap-2.5 rounded-xl bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{loginError}</span>
               </div>
             )}
             <Button type="submit" variant="hero" size="sm" className="w-full mt-1" disabled={loading}>

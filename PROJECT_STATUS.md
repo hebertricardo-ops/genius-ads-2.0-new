@@ -4,7 +4,7 @@
 **Repositório:** genius-ads-2.0 (GitHub)
 **Supabase Project Ref:** lovhzzlmuhjtbblnstfw
 **URL de Produção:** https://adsgenius.com.br
-**Última atualização:** 13 de junho de 2026
+**Última atualização:** 17 de junho de 2026
 
 ---
 
@@ -76,6 +76,8 @@
 | `user_storage` | (estrutura criada — aguarda Supabase Pro) |
 | `email_send_log` | Log de emails enviados |
 | `suppressed_emails` | Emails suprimidos |
+| `email_campaigns` | Registro de campanhas disparadas (canal, template, status, recipients_count) |
+| `email_campaign_logs` | Log por destinatário de cada campanha (status, erro, canal) |
 
 ### Funções SQL
 - `deduct_credits(user_id, amount)` → dedução atômica
@@ -99,6 +101,7 @@
 | UPLOAD_POST_API_KEY | ✅ |
 | SITE_URL | ✅ |
 | N8N_WEBHOOK_URL | ✅ |
+| N8N_WEBHOOK_CAMPAIGN_URL | ✅ (produção) |
 
 ---
 
@@ -128,6 +131,8 @@
 | `create-hotmart-user` | Cria usuário Hotmart + magic link + email boas-vindas |
 | `update-hotmart-user` | Atualiza plano/créditos/subscription (N8N) |
 | `notify-new-user` | Repassa webhook de novo cadastro ao N8N (evita CORS) |
+| `admin-send-campaign` | Disparo de campanhas email/WhatsApp via N8N (batch único com array de destinatários) |
+| `admin-dashboard` | Painel admin — overview, users, costs, generations, brands, creatives, campaigns, campaign_logs |
 
 ---
 
@@ -194,6 +199,29 @@
 - Layout padronizado nas dialogs da biblioteca
 - CTASelector com 11 opções pré-definidas
 - Histórico de edições carregado do banco no Editor IA
+
+### Admin — Sistema de Campanhas (jun/2026)
+- Aba "Campanhas" no `/admin` (`CampaignTab.tsx`)
+- Segmentação de usuários: sem criativo, free com uso, free há 7+ dias, seleção manual
+- 4 templates de campanha: `no_creative`, `feedback_request`, `plan_renewal`, `custom`
+- Templates com versão HTML (email) e texto puro (WhatsApp) — campo `messageWhatsapp`
+- Troca automática de conteúdo ao mudar canal (email ↔ WhatsApp)
+- Confirmação modal antes do disparo
+- Histórico de campanhas com logs expandíveis por destinatário
+- Edge Function `admin-send-campaign`: disparo em batch único (1 request ao N8N com array completo)
+- Header `X-Campaign-Channel: email|whatsapp` para roteamento no N8N
+- N8N: Webhook → Split Out → Loop Over Items → Switch → Espera 30s → Envia
+- Migration `email_campaigns` + `email_campaign_logs` aplicada em produção
+
+### Landing Page — Ajustes (jun/2026)
+- Seção "Garantia de 7 Dias — Risco Zero" adicionada após pricing e abaixo do CTA final
+- Card Free removido da grid de preços (3 planos pagos)
+- Créditos gratuitos corrigidos: 20 créditos (era 40)
+
+### Política de Privacidade (jun/2026)
+- Seção "Dados do Google — Login Social" adicionada
+- Detalha escopos OAuth: email, nome, avatar, Google ID
+- Informa o que NÃO é acessado, base legal (LGPD), link para revogar acesso
 
 ### Mobile — Melhorias (jun/2026)
 - `/create-select` redesenhado: grid 2 colunas (mobile empilhado, desktop lado-a-lado), cards ilustrados com badge IA, cores laranja/roxo, sem bordas

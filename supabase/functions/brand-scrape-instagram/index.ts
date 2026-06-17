@@ -101,6 +101,16 @@ serve(async (req) => {
       }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const followers  = profileData.followersCount ?? profileData.followers ?? 0;
+    const postsCount = profileData.latestPosts?.length ?? profileData.postsCount ?? 0;
+    const biography  = (profileData.biography ?? "").trim();
+
+    if (followers === 0 && postsCount === 0 && !biography) {
+      return new Response(JSON.stringify({
+        error: "Perfil não encontrado ou sem informações públicas. Verifique o @ e tente novamente.",
+      }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (profileData.private === true || profileData.isPrivate === true) {
       return new Response(JSON.stringify({
         error: "Este perfil é privado. Use um perfil público para configurar a marca.",

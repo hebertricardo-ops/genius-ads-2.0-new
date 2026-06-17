@@ -23,6 +23,13 @@ import { usePlan } from "@/hooks/usePlan";
 import { useBrandContext } from "@/contexts/BrandContext";
 import UpgradeDialog from "@/components/UpgradeDialog";
 import BrandExistsDialog from "@/components/BrandExistsDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const STEPS = ["Objetivo", "Dados Básicos", "Público-Alvo", "Estilo Visual", "Identidade", "Revisão"];
 
@@ -86,6 +93,7 @@ const BrandSetup = () => {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [isScraping, setIsScraping] = useState(false);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
+  const [showScrapeErrorDialog, setShowScrapeErrorDialog] = useState(false);
   const [scrapeLoadingMsg, setScrapeLoadingMsg] = useState("Acessando seu site...");
   const [isWebsiteFlow, setIsWebsiteFlow] = useState(false);
   const [scrapedLogoUrl, setScrapedLogoUrl] = useState<string | null>(null);
@@ -96,6 +104,7 @@ const BrandSetup = () => {
   const [instagramHandle, setInstagramHandle] = useState("");
   const [isScrapingInstagram, setIsScrapingInstagram] = useState(false);
   const [scrapeInstagramError, setScrapeInstagramError] = useState<string | null>(null);
+  const [showScrapeInstagramErrorDialog, setShowScrapeInstagramErrorDialog] = useState(false);
   const [instagramLoadingMsg, setInstagramLoadingMsg] = useState("Acessando seu perfil...");
   const [isInstagramFlow, setIsInstagramFlow] = useState(false);
   const [instagramProfile, setInstagramProfile] = useState<{ username: string; full_name: string; followers: number; profile_pic_url: string | null } | null>(null);
@@ -406,9 +415,12 @@ const BrandSetup = () => {
       setStep(2);
     } catch (err: unknown) {
       timers.forEach(clearTimeout);
-      setScrapeError(
-        err instanceof Error ? err.message : "Erro ao analisar o site. Tente novamente."
-      );
+      const rawMsg = err instanceof Error ? err.message : "";
+      const msg = (rawMsg.includes("non-2xx status code") || rawMsg.includes("Edge Function") || !rawMsg)
+        ? "A URL informada esta incorreta ou não esta acessível, verifique a URL e tente novamente."
+        : rawMsg;
+      setScrapeError(msg);
+      setShowScrapeErrorDialog(true);
     } finally {
       setIsScraping(false);
     }
@@ -445,9 +457,12 @@ const BrandSetup = () => {
       setInstagramScrapedData(data);
     } catch (err: unknown) {
       timers.forEach(clearTimeout);
-      setScrapeInstagramError(
-        err instanceof Error ? err.message : "Erro ao analisar o perfil. Tente novamente."
-      );
+      const rawMsg = err instanceof Error ? err.message : "";
+      const msg = (rawMsg.includes("non-2xx status code") || rawMsg.includes("Edge Function") || !rawMsg)
+        ? "O perfil informado está incorreto, é privado ou não está acessível. Verifique o @ e tente novamente."
+        : rawMsg;
+      setScrapeInstagramError(msg);
+      setShowScrapeInstagramErrorDialog(true);
     } finally {
       setIsScrapingInstagram(false);
     }
@@ -645,12 +660,6 @@ const BrandSetup = () => {
                   <span className="animate-pulse">{scrapeLoadingMsg}</span>
                 </div>
               )}
-              {scrapeError && (
-                <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded-lg p-2">
-                  <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                  <span>{scrapeError}</span>
-                </div>
-              )}
               <Button
                 className="w-full gradient-primary"
                 onClick={handleScrape}
@@ -694,12 +703,6 @@ const BrandSetup = () => {
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="w-3 h-3 animate-spin text-primary shrink-0" />
                   <span className="animate-pulse">{instagramLoadingMsg}</span>
-                </div>
-              )}
-              {scrapeInstagramError && (
-                <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded-lg p-2">
-                  <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                  <span>{scrapeInstagramError}</span>
                 </div>
               )}
               {instagramProfile && !isScrapingInstagram && (
@@ -1284,6 +1287,86 @@ const BrandSetup = () => {
 
   return (
     <>
+    {/* Dialog: erro de scraping de website */}
+    <Dialog open={showScrapeErrorDialog} onOpenChange={setShowScrapeErrorDialog}>
+      <DialogContent className="sm:max-w-sm mx-4 text-center">
+        <div className="flex justify-center pt-2">
+          <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
+            <AlertTriangle className="h-7 w-7 text-destructive" />
+          </div>
+        </div>
+        <DialogHeader className="text-center space-y-2">
+          <DialogTitle className="text-lg font-display font-normal text-center">
+            Não foi possível analisar o site
+          </DialogTitle>
+          <DialogDescription className="text-sm leading-relaxed">
+            {scrapeError || "Verifique se a URL está correta e se o site está acessível, depois tente novamente."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 pb-2">
+          <Button
+            className="w-full gradient-primary"
+            onClick={() => {
+              setShowScrapeErrorDialog(false);
+              setScrapeError(null);
+            }}
+          >
+            Tentar novamente
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full text-sm text-muted-foreground"
+            onClick={() => {
+              setShowScrapeErrorDialog(false);
+              setScrapeError(null);
+            }}
+          >
+            Preencher manualmente
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* Dialog: erro de scraping de Instagram */}
+    <Dialog open={showScrapeInstagramErrorDialog} onOpenChange={setShowScrapeInstagramErrorDialog}>
+      <DialogContent className="sm:max-w-sm mx-4 text-center">
+        <div className="flex justify-center pt-2">
+          <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
+            <AlertTriangle className="h-7 w-7 text-destructive" />
+          </div>
+        </div>
+        <DialogHeader className="text-center space-y-2">
+          <DialogTitle className="text-lg font-display font-normal text-center">
+            Não foi possível analisar o perfil
+          </DialogTitle>
+          <DialogDescription className="text-sm leading-relaxed">
+            {scrapeInstagramError || "O perfil informado está incorreto, é privado ou não está acessível. Verifique o @ e tente novamente."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 pb-2">
+          <Button
+            className="w-full gradient-primary"
+            onClick={() => {
+              setShowScrapeInstagramErrorDialog(false);
+              setScrapeInstagramError(null);
+            }}
+          >
+            Tentar novamente
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full text-sm text-muted-foreground"
+            onClick={() => {
+              setShowScrapeInstagramErrorDialog(false);
+              setScrapeInstagramError(null);
+            }}
+          >
+            Preencher manualmente
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
     <BrandExistsDialog
       open={showBrandExists}
       onClose={() => setShowBrandExists(false)}
