@@ -98,7 +98,8 @@ serve(async (req) => {
     formData.append("description", caption);
     formData.append("async_upload", "true");
     if (scheduled_for) {
-      formData.append("schedule_date", scheduled_for);
+      formData.append("scheduled_date", scheduled_for);
+      formData.append("timezone", "America/Sao_Paulo");
     }
 
     const publishRes = await fetch(`${UPLOAD_POST_BASE}/upload_photos`, {

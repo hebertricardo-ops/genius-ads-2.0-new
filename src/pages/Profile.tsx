@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Coins, Save, Loader2, ShoppingCart, Instagram, Facebook, Smartphone, Phone } from "lucide-react";
+import { Camera, Coins, Save, Loader2, ShoppingCart, Instagram, Facebook, Smartphone, Phone, Lock, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useSocialPublish } from "@/hooks/useSocialPublish";
 
 const formatWhatsApp = (value: string) => {
@@ -27,6 +27,15 @@ const Profile = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const isGoogleUser = user?.app_metadata?.provider === "google"
+    || user?.identities?.some((id: any) => id.provider === "google");
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile", user?.id],
@@ -99,6 +108,60 @@ const Profile = () => {
       toast({ title: "Erro ao enviar foto", description: err.message, variant: "destructive" });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordError("");
+    setPasswordSuccess(false);
+
+    if (!currentPassword) {
+      setPasswordError("Informe sua senha atual.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError("A nova senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("As senhas não coincidem.");
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setPasswordError("A nova senha deve ser diferente da senha atual.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user!.email!,
+        password: currentPassword,
+      });
+
+      if (authError) {
+        setPasswordError("Senha atual incorreta. Verifique e tente novamente.");
+        return;
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        setPasswordError("Erro ao atualizar a senha. Tente novamente.");
+        return;
+      }
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordSuccess(true);
+      setTimeout(() => setPasswordSuccess(false), 4000);
+    } catch {
+      setPasswordError("Erro inesperado. Tente novamente.");
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -214,6 +277,80 @@ const Profile = () => {
             </Button>
           </div>
         </div>
+
+        {/* Alterar Senha — oculto para usuários Google OAuth */}
+        {!isGoogleUser && (
+          <div className="gradient-card rounded-2xl border border-border shadow-card p-6 space-y-5 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Lock className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="font-display font-normal text-foreground">Alterar Senha</h2>
+                <p className="text-xs text-muted-foreground">Informe sua senha atual para definir uma nova</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Senha atual</Label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={currentPassword}
+                  onChange={(e) => { setCurrentPassword(e.target.value); setPasswordError(""); }}
+                  disabled={isChangingPassword}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Nova senha</Label>
+                <Input
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  value={newPassword}
+                  onChange={(e) => { setNewPassword(e.target.value); setPasswordError(""); }}
+                  disabled={isChangingPassword}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Confirmar nova senha</Label>
+                <Input
+                  type="password"
+                  placeholder="Repita a nova senha"
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(""); }}
+                  disabled={isChangingPassword}
+                />
+              </div>
+            </div>
+
+            {passwordError && (
+              <div className="flex items-start gap-2.5 rounded-xl bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            {passwordSuccess && (
+              <div className="flex items-start gap-2.5 rounded-xl bg-green-500/10 border border-green-500/30 px-4 py-3 text-sm text-green-600">
+                <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>Senha alterada com sucesso!</span>
+              </div>
+            )}
+
+            <Button
+              onClick={handleChangePassword}
+              disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
+              className="w-full sm:w-auto gradient-primary"
+            >
+              {isChangingPassword ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Alterando...</>
+              ) : (
+                <><Lock className="h-4 w-4 mr-2" />Alterar Senha</>
+              )}
+            </Button>
+          </div>
+        )}
 
         {/* Credits */}
         <div className="gradient-card rounded-2xl border border-border shadow-card p-6 animate-fade-in">
