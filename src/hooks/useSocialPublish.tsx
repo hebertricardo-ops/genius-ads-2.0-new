@@ -70,17 +70,39 @@ export const useSocialPublish = () => {
     // Abrir aba em branco sincronamente (no gesto do usuário) para evitar bloqueio de popup
     const newTab = window.open("", "_blank");
     try {
-      const { data, error } = await supabase.functions.invoke("social-connect", {
-        body: { brand_id: selectedBrand?.id },
-      });
-      if (error) throw new Error(error.message ?? "Falha ao gerar link de conexão");
-      if (!data?.connect_url) throw new Error("URL de conexão não retornada");
-      if (newTab) {
-        newTab.location.href = data.connect_url;
-      } else {
-        window.open(data.connect_url, "_blank");
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/social-connect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ brand_id: selectedBrand?.id }),
+        },
+      );
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        const message = responseData?.error ?? "Falha ao gerar link de conexão";
+        if (response.status === 403) {
+          const err = new Error(message) as Error & { code: string };
+          err.code = "SOCIAL_LIMIT_REACHED";
+          throw err;
+        }
+        throw new Error(message);
       }
-      return data;
+
+      if (!responseData?.connect_url) throw new Error("URL de conexão não retornada");
+
+      if (newTab) {
+        newTab.location.href = responseData.connect_url;
+      } else {
+        window.open(responseData.connect_url, "_blank");
+      }
+      return responseData;
     } catch (err) {
       newTab?.close();
       throw err;

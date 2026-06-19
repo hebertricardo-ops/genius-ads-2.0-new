@@ -219,8 +219,19 @@ const SocialAccounts = () => {
     });
   };
 
+  // Skeleton enquanto plano carrega — elimina race condition
+  if (planLoading) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
   // ── Gate: sem acesso ao plano ──────────────────────────────────────────────
-  if (!planLoading && !hasSocialMedia) {
+  if (!hasSocialMedia) {
     return (
       <>
         <div className="max-w-2xl mx-auto px-4 py-16 text-center">

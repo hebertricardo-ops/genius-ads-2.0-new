@@ -52,6 +52,40 @@ serve(async (req) => {
       );
     }
 
+    // Verificar se o plano do usuário inclui redes sociais
+    const { data: sub } = await supabaseAdmin
+      .from("subscriptions")
+      .select("plans(has_social_media, max_social_profiles)")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle();
+
+    const plan = (sub?.plans as any) ?? null;
+
+    if (!plan?.has_social_media) {
+      return new Response(
+        JSON.stringify({ error: "Seu plano não inclui publicação em redes sociais. Faça upgrade para Advanced ou Social Media." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Verificar limite de perfis do plano (excluindo a própria marca — reconexão é permitida)
+    const maxProfiles = plan.max_social_profiles ?? 0;
+    if (maxProfiles > 0) {
+      const { count: currentProfiles } = await supabaseAdmin
+        .from("social_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .neq("brand_id", brand_id);
+
+      if ((currentProfiles ?? 0) >= maxProfiles) {
+        return new Response(
+          JSON.stringify({ error: `Limite de ${maxProfiles} perfil${maxProfiles > 1 ? "is" : ""} atingido no seu plano.` }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     // 1. Verificar se já existe social_profile para esta marca
     const { data: existingProfile } = await supabaseAdmin
       .from("social_profiles")
